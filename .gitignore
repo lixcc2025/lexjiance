@@ -1,0 +1,7 @@
+node_modules/
+desktop/out/
+__pycache__/
+*.pyc
+.venv/
+models/
+*.onnx

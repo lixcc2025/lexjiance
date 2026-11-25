@@ -1,0 +1,12 @@
+[project]
+name = "avengine"
+version = "0.1.0"
+description = "音视频 AI 生成 / 剪辑痕迹检测引擎（桌面端的检测后台）"
+requires-python = ">=3.10"
+dependencies = []   # 现在只用标准库 + ffprobe；接入信号分析、模型时再加 numpy、onnxruntime 等
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["avengine*"]

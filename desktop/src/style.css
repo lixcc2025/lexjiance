@@ -1,0 +1,5 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f8; }
+button { font: inherit; cursor: pointer; border: 1px solid #c9cdd4; background: #fff; border-radius: 6px; padding: 6px 14px; }
+button.primary { background: #2f5bea; border-color: #2f5bea; color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
