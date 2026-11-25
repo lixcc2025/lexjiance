@@ -191,6 +191,15 @@ watch(() => [props.preview, props.findings.length, props.now, props.duration], (
 .lb { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); padding-left: 2px; }
 .ruler-lb { height: 18px; }
 .h-frames { height: 46px; } .h-wave { height: 58px; } .h-spec { height: 58px; } .h-mark { height: 24px; }
+@media (max-height: 760px) {
+  .tl { padding: 8px 12px 10px; }
+  .tl-head { margin-bottom: 4px; }
+  .h-frames { height: 34px; } .h-wave { height: 42px; } .h-spec { height: 38px; } .h-mark { height: 22px; }
+  .whole span, .mk { font-size: 10.5px; }
+  .whole { inset: 2px 0; }
+  .labels { width: 70px; }
+}
+@media (max-width: 1120px) { .legend { display: none; } }
 
 .tracks { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; cursor: crosshair; }
 .ruler { position: relative; height: 18px; border-bottom: 1px solid var(--border); }

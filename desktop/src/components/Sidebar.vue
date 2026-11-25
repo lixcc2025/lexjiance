@@ -25,7 +25,7 @@ function when(t: number) {
 
 <template>
   <aside class="side" :class="{ mac }">
-    <div class="top drag">
+    <div v-if="mac" class="top drag">
       <div class="brand nodrag" @click="emit('home')">
         <div class="logo">
           <svg viewBox="0 0 32 32" width="20" height="20"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9cc0ff" /><stop offset="1" stop-color="#ffffff" /></linearGradient></defs>
@@ -38,7 +38,7 @@ function when(t: number) {
       </div>
     </div>
 
-    <button class="primary new" @click="emit('new')"><Icon name="plus" :size="15" :stroke="2.2" />新建检测<span class="kbd">{{ mac ? "⌘O" : "Ctrl O" }}</span></button>
+    <button class="primary new" @click="emit('new')"><Icon name="plus" :size="15" :stroke="2.2" />新建检测<span class="kbd">{{ mac ? "⌘O" : "Ctrl+O" }}</span></button>
 
     <div class="sec">
       <span class="label">检测记录</span>
@@ -78,6 +78,10 @@ function when(t: number) {
 .side.mac { background: transparent; }
 .top { height: 92px; padding: 44px 18px 0; }
 .mac .top { padding-top: 46px; }
+.side:not(.mac) .new { margin-top: 14px; }
+@media (max-width: 1180px) { .side { width: 220px; } .time { display: none; } }
+@media (max-width: 1040px) { .side { width: 196px; } .kbd { display: none; } }
+@media (max-height: 760px) { .mac .top { height: 78px; padding-top: 40px; } .new { margin-bottom: 12px; } .item { padding: 6px 10px; } }
 .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(145deg, #3a6fe0 0%, #1d3a8a 100%); box-shadow: 0 0 0 1px rgba(255, 255, 255, .12) inset, 0 6px 16px rgba(45, 95, 220, .35); }
 .name { font-size: 14px; font-weight: 650; letter-spacing: .4px; }

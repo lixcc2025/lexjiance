@@ -29,7 +29,7 @@
   --wave-played: #6f9dff;
   --radius: 12px;
   --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 8px 28px rgba(0, 0, 0, .28);
-  --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  --mono: "SF Mono", "Cascadia Mono", ui-monospace, Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -62,7 +62,8 @@
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  /* macOS：苹方；Windows：英文数字 Segoe UI、中文微软雅黑 UI */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   font-size: 13px;
   color: var(--text);
   background: var(--bg);

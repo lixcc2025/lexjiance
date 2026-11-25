@@ -57,7 +57,7 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
       <audio ref="el" :src="url" preload="metadata" @play="onPlay" @pause="onPause" @loadedmetadata="onMeta" @seeked="loop" @ended="onPause" />
     </template>
 
-    <button v-if="!playing" class="bigplay" @click="toggle"><Icon name="play" :size="22" :stroke="2" /></button>
+    <button v-if="!playing && isVideo" class="bigplay" @click="toggle"><Icon name="play" :size="22" :stroke="2" /></button>
 
     <div class="bar">
       <button class="flat icon" :title="playing ? '暂停（空格）' : '播放（空格）'" @click="toggle"><Icon :name="playing ? 'pause' : 'play'" :size="14" :stroke="2.2" /></button>
@@ -99,4 +99,10 @@ video { width: 100%; height: 100%; object-fit: contain; display: block; backgrou
 .time { font-size: 12px; margin-left: 4px; }
 .time i { color: rgba(223, 230, 245, .4); font-style: normal; margin: 0 2px; }
 .grow { flex: 1; }
+@media (max-height: 760px) {
+  .audio-face { gap: 6px; padding-bottom: 44px; }
+  .disc { width: 50px; height: 50px; border-radius: 15px; }
+  .tc { font-size: 20px; }
+  .an { font-size: 13px; }
+}
 </style>

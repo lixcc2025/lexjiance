@@ -1,6 +1,6 @@
 // 主进程：窗口、选文件、调检测引擎（Python 子进程，逐行 JSON 事件）、本地媒体回放协议。
 // 全程离线：文件不上传，引擎在本机跑（法院、检察院多在内网）。
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, shell } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, screen, shell } from "electron"
 import { spawn, execFile, ChildProcess } from "child_process"
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs"
 import { createHash } from "crypto"
@@ -28,18 +28,33 @@ function engineCommand(): { cmd: string; cwd: string } {
   return { cmd, cwd }
 }
 
+// 平台：开发时可用 AVD_PLATFORM=win32 在别的系统上模拟 Windows 的窗口样式（云端截图检查用）
+const PLATFORM = (!app.isPackaged && process.env.AVD_PLATFORM) || process.platform
+const IS_MAC = PLATFORM === "darwin"
+const TITLEBAR_H = 40 // Windows 标题栏高度（右上角系统按钮的高度）
+
+// Windows 右上角的最小化 / 最大化 / 关闭按钮由系统画，颜色跟主题走
+function overlayColors() {
+  return nativeTheme.shouldUseDarkColors ? { color: "#161920", symbolColor: "#aab2c2" } : { color: "#ffffff", symbolColor: "#4b5466" }
+}
+
 function createWindow() {
-  const mac = process.platform === "darwin"
+  // 初始大小按屏幕可用区域算：1366×768 笔记本、1920×1080 开 150% 缩放（实际 1280×720）也放得下
+  // 1366×768 开 125% 缩放、去掉任务栏只剩约 1093×580，最小尺寸按这个定
+  const wa = screen.getPrimaryDisplay().workAreaSize
+  const fixed = !app.isPackaged && /^(\d+)x(\d+)$/.exec(process.env.AVD_WINDOW_SIZE || "") // 开发用：固定窗口大小检查小屏布局
   win = new BrowserWindow({
-    width: 1360,
-    height: 860,
-    minWidth: 1080,
-    minHeight: 680,
+    width: fixed ? Number(fixed[1]) : Math.min(1360, Math.round(wa.width * 0.94)),
+    height: fixed ? Number(fixed[2]) : Math.min(860, Math.round(wa.height * 0.94)),
+    ...(fixed ? { x: 0, y: 0 } : {}),
+    minWidth: 940,
+    minHeight: 560,
     title: "音视频检测",
     // macOS：标题栏融进窗口、红绿灯嵌在侧栏上，侧栏用系统半透明材质
-    ...(mac
+    // Windows：自绘标题栏，系统按钮用「窗口控件覆盖」嵌在右上角
+    ...(IS_MAC
       ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 18, y: 20 }, vibrancy: "sidebar" as const, visualEffectState: "active" as const, backgroundColor: "#00000000" }
-      : { backgroundColor: "#14161b" }),
+      : { titleBarStyle: "hidden" as const, titleBarOverlay: { ...overlayColors(), height: TITLEBAR_H }, backgroundColor: nativeTheme.shouldUseDarkColors ? "#0f1115" : "#f5f6f8" }),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -133,8 +148,10 @@ ipcMain.handle("list-detectors", () => new Promise((res) => {
 // media:// 只放行用户打开过的文件和预览素材目录，不能拿它读本机其他文件
 const allowed = new Set<string>()
 const PREVIEW_ROOT = join(app.getPath("temp"), "avdetect-preview")
-function allow(p: string) { allowed.add(resolve(p)) }
-function isAllowed(p: string) { const r = resolve(p); return allowed.has(r) || r.startsWith(PREVIEW_ROOT + (process.platform === "win32" ? "\\" : "/")) }
+// Windows 路径不分大小写，统一转小写再比
+const norm = (p: string) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p))
+function allow(p: string) { allowed.add(norm(p)) }
+function isAllowed(p: string) { const r = norm(p); return allowed.has(r) || r.startsWith(norm(PREVIEW_ROOT) + (process.platform === "win32" ? "\\" : "/")) }
 
 // 时间轴预览素材（缩略帧、波形、频谱图）：按「路径 + 大小 + 修改时间」缓存，同一个文件第二次打开不重算
 ipcMain.handle("preview", (_e, file: string) => new Promise((res) => {
@@ -159,8 +176,13 @@ ipcMain.handle("preview", (_e, file: string) => new Promise((res) => {
 
 // 主题：跟随系统 / 浅色 / 深色。改 nativeTheme 会同时影响 macOS 侧栏材质和页面的 prefers-color-scheme
 ipcMain.handle("set-theme", (_e, t: string) => { nativeTheme.themeSource = t === "light" || t === "dark" ? t : "system" })
+nativeTheme.on("updated", () => {
+  if (!IS_MAC && win && !win.isDestroyed()) {
+    try { win.setTitleBarOverlay({ ...overlayColors(), height: TITLEBAR_H }) } catch { /* 不支持的系统忽略 */ }
+  }
+})
 
-ipcMain.handle("app-info", () => ({ platform: process.platform, version: app.getVersion() }))
+ipcMain.handle("app-info", () => ({ platform: PLATFORM, version: app.getVersion(), titlebar: IS_MAC ? 0 : TITLEBAR_H }))
 
 ipcMain.handle("show-in-folder", (_e, p: string) => { if (typeof p === "string" && existsSync(p)) shell.showItemInFolder(p) })
 
@@ -210,7 +232,7 @@ function serveMedia(req: Request): Response {
 
 app.whenReady().then(() => {
   // macOS 要有应用菜单，复制粘贴、退出这些快捷键才能用；其他平台不要菜单栏
-  if (process.platform === "darwin") {
+  if (IS_MAC) {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: "音视频检测", submenu: [{ role: "about", label: "关于" }, { type: "separator" }, { role: "hide", label: "隐藏" }, { role: "quit", label: "退出" }] },
       { label: "文件", submenu: [{ label: "打开…", accelerator: "CmdOrCtrl+O", click: () => win?.webContents.send("menu", "open") }, { role: "close", label: "关闭窗口" }] },

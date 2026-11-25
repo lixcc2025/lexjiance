@@ -51,7 +51,7 @@ declare global {
       listDetectors(): Promise<DetectorInfo[]>
       preview(path: string): Promise<Preview | null>
       setTheme(t: string): Promise<void>
-      appInfo(): Promise<{ platform: string; version: string }>
+      appInfo(): Promise<{ platform: string; version: string; titlebar: number }>
       onMenu(cb: (cmd: string) => void): void
       showInFolder(path: string): Promise<void>
       fileExists(path: string): Promise<boolean>

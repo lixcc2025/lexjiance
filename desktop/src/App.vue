@@ -119,6 +119,7 @@ onMounted(async () => {
   const info = await window.avd.appInfo()
   mac.value = info.platform === "darwin"
   document.body.classList.toggle("mac", mac.value)
+  document.body.classList.toggle("win", !mac.value)
   window.avd.setTheme(theme.value)
   window.avd.onOpenFile((p) => start(p))
   window.avd.onMenu((c) => { if (c === "open") choose() })
@@ -137,14 +138,21 @@ onBeforeUnmount(() => { off && off(); window.removeEventListener("keydown", onKe
 </script>
 
 <template>
-  <div class="shell" @dragover.prevent="dragging = true" @dragleave.self.prevent="dragging = false" @drop.prevent="onDrop">
+  <div class="shell" :class="{ mac, win: !mac }" @dragover.prevent="dragging = true" @dragleave.self.prevent="dragging = false" @drop.prevent="onDrop">
+    <!-- Windows：整条标题栏，右上角是系统的最小化 / 最大化 / 关闭（窗口控件覆盖） -->
+    <div v-if="!mac" class="titlebar drag">
+      <div class="tb-logo"><svg viewBox="0 0 32 32" width="13" height="13"><path d="M3 16h4l3-8 4 16 4-12 3 7 2-3h6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+      <span class="tb-name">音视频检测</span>
+      <template v-if="file"><span class="tb-sep">—</span><span class="tb-file">{{ baseName(file) }}</span></template>
+    </div>
+    <div class="body">
     <Sidebar :history="history" :active="file" :engine-ready="detectors.length > 0" :mac="mac" :theme="theme" @new="choose" @open="openFromHistory" @home="goHome" @clear="clearHistory" @theme="setTheme" />
 
     <section class="main">
       <HomeHero v-if="!file" :dragging="dragging" :mac="mac" @pick="choose" />
 
       <template v-else>
-        <header class="bar drag">
+        <header class="bar" :class="{ drag: mac }">
           <div class="fi"><Icon :name="isVideo ? 'video' : 'audio'" :size="16" /></div>
           <div class="fn">
             <div class="name">{{ baseName(file) }}</div>
@@ -155,7 +163,7 @@ onBeforeUnmount(() => { off && off(); window.removeEventListener("keydown", onKe
           </div>
           <div class="acts nodrag">
             <button v-if="result || error" class="flat" title="重新检测" @click="start(file!)"><Icon name="refresh" :size="14" />重新检测</button>
-            <button class="flat" :title="mac ? '在访达中显示' : '在文件夹中显示'" @click="showFolder"><Icon name="folder" :size="14" />{{ mac ? "在访达中显示" : "所在文件夹" }}</button>
+            <button class="flat" :title="mac ? '在访达中显示' : '打开文件所在的文件夹'" @click="showFolder"><Icon name="folder" :size="14" />{{ mac ? "在访达中显示" : "打开所在位置" }}</button>
           </div>
         </header>
 
@@ -183,12 +191,19 @@ onBeforeUnmount(() => { off && off(); window.removeEventListener("keydown", onKe
       </template>
     </section>
 
+    </div>
     <div v-if="dragging" class="mask"><div class="mask-box"><Icon name="upload" :size="26" />松开即可开始检测</div></div>
   </div>
 </template>
 
 <style scoped>
-.shell { height: 100%; display: flex; position: relative; }
+.shell { height: 100%; display: flex; flex-direction: column; position: relative; }
+.body { flex: 1; min-height: 0; display: flex; }
+.titlebar { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 150px 0 14px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-2); }
+.tb-logo { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; background: linear-gradient(145deg, #3a6fe0 0%, #1d3a8a 100%); }
+.tb-name { font-weight: 600; color: var(--text); }
+.tb-sep { color: var(--faint); }
+.tb-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
 
 .bar { height: 60px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 18px; border-bottom: 1px solid var(--border); background: var(--surface); }
@@ -205,6 +220,18 @@ onBeforeUnmount(() => { off && off(); window.removeEventListener("keydown", onKe
 .stage-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .viewer-wrap { flex: 1; min-height: 200px; }
 .side-col { width: 384px; flex: none; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+
+/* 小屏：1366×768 笔记本、1920×1080 开 150% 缩放（实际 1280×720）都要放得下 */
+@media (max-width: 1320px) { .side-col { width: 340px; } .chips span:nth-child(n + 5) { display: none; } }
+@media (max-width: 1120px) { .side-col { width: 300px; } .chips { display: none; } .fn { max-width: none; flex: 1; } .acts button { padding: 0 8px; } }
+@media (max-height: 760px) {
+  .bar { height: 50px; }
+  .work { gap: 10px; padding: 10px; }
+  .stage-col, .side-col { gap: 10px; }
+  .viewer-wrap { min-height: 130px; }
+  .status { height: 24px; }
+  .keys { display: none; }
+}
 
 .status { height: 28px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 11px; color: var(--faint); border-top: 1px solid var(--border); background: var(--surface); }
 .status span { display: inline-flex; align-items: center; gap: 5px; }

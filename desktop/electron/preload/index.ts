@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("avd", {
   listDetectors: (): Promise<any[]> => ipcRenderer.invoke("list-detectors"),
   preview: (path: string): Promise<any> => ipcRenderer.invoke("preview", path),
   setTheme: (t: string): Promise<void> => ipcRenderer.invoke("set-theme", t),
-  appInfo: (): Promise<{ platform: string; version: string }> => ipcRenderer.invoke("app-info"),
+  appInfo: (): Promise<{ platform: string; version: string; titlebar: number }> => ipcRenderer.invoke("app-info"),
   onMenu: (cb: (cmd: string) => void) => ipcRenderer.on("menu", (_e, c: string) => cb(c)),
   showInFolder: (path: string): Promise<void> => ipcRenderer.invoke("show-in-folder", path),
   fileExists: (path: string): Promise<boolean> => ipcRenderer.invoke("file-exists", path),

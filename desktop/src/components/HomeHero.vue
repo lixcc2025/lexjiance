@@ -21,7 +21,7 @@ const CAPS = [
 
 <template>
   <div class="home">
-    <div class="drag topbar" />
+    <div v-if="mac" class="drag topbar" />
     <div class="hero">
       <div class="art" aria-hidden="true">
         <svg viewBox="0 0 720 150" preserveAspectRatio="none">
@@ -84,6 +84,8 @@ h1 { font-size: 30px; font-weight: 700; letter-spacing: 1px; margin: 0 0 10px; }
 .drop button { margin-left: auto; height: 34px; padding: 0 18px; }
 .kbd { font-size: 11px; color: var(--muted); font-family: var(--mono); }
 .formats { margin-top: 12px; font-size: 11.5px; color: var(--muted); letter-spacing: .3px; }
+@media (max-height: 760px) { .hero { padding-top: 36px; } .art { height: 96px; margin-bottom: 22px; } h1 { font-size: 25px; } .lead { margin-bottom: 20px; } .caps { margin-top: 26px !important; } .privacy { margin-top: 16px !important; } }
+@media (max-width: 1080px) { .caps { grid-template-columns: 1fr 1fr 1fr; gap: 8px; } .drop { min-width: 0; width: 100%; } }
 .caps { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
 .cap { text-align: left; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
 .ci { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; margin-bottom: 12px; }
