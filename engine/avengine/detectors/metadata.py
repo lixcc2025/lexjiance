@@ -48,12 +48,16 @@ EDITOR_MARKERS = {
 DEVICE_KEYS = ("com.apple.quicktime.make", "com.apple.quicktime.model", "make", "model",
                "com.android.manufacturer", "com.android.model", "com.apple.quicktime.software")
 
-# 隐式标识里的字段（TODO：按 GB 45438-2025 原文核对字段名和含义）
+# 隐式标识（GB 45438-2025 附录 E，已核对）：元数据里加一个名字含「AIGC」的扩展字段，值是
+#   {"AIGC":{"Label":"1","ContentProducer":"…","ProduceID":"…","ReservedCode1":"…","ContentPropagator":"…","PropagateID":"…","ReservedCode2":"…"}}
+# Label："1" 是生成合成内容，"2" 可能是，"3" 疑似是（对应《标识办法》第六条三种情形）；ReservedCode1/2 留作完整性保护（签名），这里不校验
+# MP4 写在 moov.udta.meta.ilst（ffmpeg：-metadata AIGC=... -movflags use_metadata_tags），FLV 在 onMetaData，MP3 在 ID3 自定义字段
 AIGC_FIELDS = {
     "Label": "生成合成标签", "ContentProducer": "生成合成服务提供者", "ProduceID": "内容制作编号",
     "ContentPropagator": "传播服务提供者", "PropagateID": "内容传播编号",
-    "ReservedCode1": "预留字段 1", "ReservedCode2": "预留字段 2",
+    "ReservedCode1": "完整性保护字段（生成方）", "ReservedCode2": "完整性保护字段（传播方）",
 }
+AIGC_LABELS = {"1": "是 AI 生成合成内容", "2": "可能是 AI 生成合成内容", "3": "疑似 AI 生成合成内容"}
 
 # JUMBF：jumd 描述框里，16 字节类型 + 1 字节开关之后是以 0 结尾的标签；C2PA 的标签是 c2pa
 C2PA_BOX = re.compile(rb"jumd.{17}c2pa\x00", re.S)
@@ -125,7 +129,7 @@ def _read_head_tail(path: str, size: int) -> bytes:
 def _find_aigc_label(tags: dict[str, str], blob: bytes) -> tuple[str, str] | None:
     """隐式标识：先看 ffprobe 读到的标签，再在原始字节里找 "AIGC" 后面跟的 JSON"""
     for k, v in tags.items():
-        if k.split(":", 1)[-1].lower() == "aigc":
+        if "aigc" in k.split(":", 1)[-1].lower():   # 标准要求字段名「包含」AIGC
             return k, v
     m = re.search(rb"AIGC.{0,16}?(\{[^{}]{0,2000}\})", blob, re.S)
     if m:
@@ -158,16 +162,22 @@ class MetadataDetector(Detector):
                 fields = json.loads(value)
             except (json.JSONDecodeError, TypeError):
                 fields = None
+            if isinstance(fields, dict) and isinstance(fields.get("AIGC"), dict):
+                fields = fields["AIGC"]   # 标准格式外面还包一层 {"AIGC": {...}}
+            lab = str(fields.get("Label", "")).strip() if isinstance(fields, dict) else ""
             if isinstance(fields, dict):
                 for k, v in fields.items():
                     if v in ("", None):
                         continue
-                    ev[AIGC_FIELDS.get(k, k)] = v
+                    ev[AIGC_FIELDS.get(k, k)] = f"{v}（{AIGC_LABELS[str(v)]}）" if k == "Label" and str(v) in AIGC_LABELS else v
             else:
                 ev["内容"] = value[:500]
-            out.append(Finding(self.name, AI, "high", "文件带有 AI 生成内容的隐式标识",
-                               "按《人工智能生成合成内容标识办法》，AI 生成的音视频要在元数据里写入隐式标识。"
-                               "这个文件里有这类标识，说明它很可能由 AI 生成或经过 AI 合成。",
+            meaning = AIGC_LABELS.get(lab, "")
+            out.append(Finding(self.name, AI, "high" if lab in ("", "1") else "medium",
+                               "文件带有 AI 生成内容的隐式标识" + (f"：{meaning}" if meaning else ""),
+                               "按《人工智能生成合成内容标识办法》和 GB 45438-2025，AI 生成合成的音视频要在元数据里写入隐式标识，"
+                               "标签 1 表示是、2 表示可能是、3 表示疑似是 AI 生成合成内容。标识里的完整性保护字段（签名）本软件暂不校验；"
+                               "元数据可以被删改，结合其他检测结果判断。",
                                evidence=ev, signal="aigc_label"))
 
         # 2. 标签里的 AI 工具名：机器写入的字段（编码器、软件、处理器名等）才算强信号

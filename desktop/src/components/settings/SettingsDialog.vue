@@ -167,8 +167,9 @@ h3 { font-size: 13px; margin: 6px 0 8px; }
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; font-size: 12px; color: var(--text-2); }
 .field input { height: 32px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text); padding: 0 10px; font: inherit; font-size: 13px; outline: none; }
 .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
-.row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-.msg { font-size: 12px; color: var(--ok); }
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.row button { flex: none; white-space: nowrap; }
+.msg { font-size: 12px; color: var(--ok); flex: 1 1 240px; line-height: 1.6; }
 .msg.bad { color: var(--danger); }
 .warn { font-size: 12px; line-height: 1.7; color: var(--text-2); background: var(--warn-bg); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
 .warn b { color: var(--warn); }

@@ -1,6 +1,6 @@
 {
   "name": "avdetect-desktop",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "音视频 AI 生成 / 剪辑痕迹检测",
   "main": "out/main/index.js",

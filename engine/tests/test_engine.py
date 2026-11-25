@@ -34,7 +34,9 @@ class EngineTest(unittest.TestCase):
            "-fps_mode", "passthrough", *X264, os.path.join(d, "gap.mp4"))
         # 固定 1 秒一个关键帧，2.5 秒处强制多插一个
         ff(*src[:4], "-t", "6", "-force_key_frames", "2.5", *X264, os.path.join(d, "extra_key.mp4"))
-        aigc = json.dumps({"Label": "1", "ContentProducer": "测试生成服务", "ProduceID": "abc123"}, ensure_ascii=False)
+        # GB 45438-2025 附录 E 的格式：外面包一层 {"AIGC": {...}}
+        aigc = json.dumps({"AIGC": {"Label": "1", "ContentProducer": "测试生成服务", "ProduceID": "abc123", "ReservedCode1": "",
+                                    "ContentPropagator": "测试生成服务", "PropagateID": "abc123", "ReservedCode2": ""}}, ensure_ascii=False)
         ff("-f", "lavfi", "-i", "sine=frequency=440:sample_rate=16000", "-t", "3", "-metadata", f"AIGC={aigc}",
            os.path.join(d, "aigc.mp3"))
         # 机器写入的字段（处理器名）带生成工具名
@@ -106,6 +108,18 @@ class EngineTest(unittest.TestCase):
         self.assertEqual([f.title for f in r.findings if f.category == AI], [])
         r, _ = self.run_on("illuminate.mp3")   # 「luma」不能命中「Illuminate」
         self.assertEqual([f.title for f in r.findings if f.category == AI], [])
+
+    def test_aigc_label_mp4_and_maybe(self):
+        # 视频实践指南的写法：MP4 用 use_metadata_tags 写进 ilst；Label=2「可能是」→ 可疑而不是高度可疑
+        p = os.path.join(self.dir, "aigc2.mp4")
+        v = json.dumps({"AIGC": {"Label": "2", "ContentProducer": "某平台", "ProduceID": "x1"}}, ensure_ascii=False)
+        ff("-f", "lavfi", "-i", "testsrc=size=160x120:rate=25", "-t", "1", *X264, "-metadata", f"AIGC={v}", "-movflags", "use_metadata_tags", p)
+        r, _ = self.run_on("aigc2.mp4")
+        hit = [f for f in r.findings if f.signal == "aigc_label"]
+        self.assertEqual(len(hit), 1, [f.title for f in r.findings])
+        self.assertEqual(hit[0].severity, "medium")
+        self.assertIn("可能是", hit[0].title)
+        self.assertEqual(r.ai.level, "suspicious")
 
     def test_ai_tool_name(self):
         r, _ = self.run_on("kling.mp4")
