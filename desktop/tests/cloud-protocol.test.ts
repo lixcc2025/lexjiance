@@ -53,6 +53,17 @@ describe("mergeCloud", () => {
     expect(r.ai.level).toBe("none")
     expect(r.detectors.find((d) => d.name === "ai_video")?.skipped).toBe("服务器未返回")
   })
+  it("未知检测项不影响 aiRan：三个真检测项都没跑时 AI 结论仍是无法判断", () => {
+    const r = mergeCloud(local, { findings: [], detectors: [{ name: "foo", title: "foo", desc: "", ok: true, skipped: "", error: "", seconds: 0 }] })
+    expect(r.ai.level).toBe("unknown")
+    expect(r.detectors.map((d) => d.name)).toEqual(["metadata", "ai_voice", "ai_video", "watermark", "foo"])
+  })
+  it("detectors 为空或全部跳过 / 出错：AI 结论是无法判断", () => {
+    expect(mergeCloud(local, { findings: [], detectors: [] }).ai.level).toBe("unknown")
+    const s = (name: string, x: object) => ({ name, title: name, desc: "", ok: true, skipped: "", error: "", seconds: 0, ...x })
+    const r = mergeCloud(local, { findings: [], detectors: [s("ai_voice", { skipped: "没有声音" }), s("ai_video", { ok: false, error: "模型加载失败" })] })
+    expect(r.ai.level).toBe("unknown")
+  })
   it("云端发现合成语音：合并疑点、重算结论、按严重程度排序", () => {
     const r = mergeCloud(local, {
       findings: [{ detector: "ai_voice", category: "ai", severity: "high", title: "合成语音", detail: "", modality: "audio", start: 1, end: 4, evidence: { 分数: 0.97 } }],

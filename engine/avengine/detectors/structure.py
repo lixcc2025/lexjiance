@@ -45,7 +45,7 @@ def _keyframe_irregular(pk: list[dict[str, Any]]) -> tuple[list[float], Optional
     iv = [round(b - a, 2) for a, b in zip(kf, kf[1:])]
     common = statistics.mode(iv)
     share = sum(1 for x in iv if abs(x - common) <= 0.05) / len(iv)
-    if share < 0.8 or common <= 0:
+    if share < 0.7 or common <= 0:   # 七成以上间隔一致才算「固定节奏」（原来 0.8，多插一个关键帧就刚好卡线）
         return [], None   # 本来就不规律（可变 GOP），不判断
     odd = [kf[i + 1] for i, x in enumerate(iv) if x < common - 0.05 and i + 1 < len(kf) - 1]
     return odd, common

@@ -79,6 +79,7 @@ export function mergeCloud(local: AnalyzeResult, cloud: CloudResponse | null, st
   const others = extraStatus.filter((s) => !CLOUD_DETECTORS.some((d) => d.name === s.name))
   const detectors = [...local.detectors, ...filled, ...others]
   const findings = sortFindings([...local.findings, ...(cloud ? cloud.findings : [])])
-  const aiRan = [...filled, ...others].some((s) => s.ok && !s.skipped && !s.error)
+  // 只有已知的云端检测项真正跑完才算「AI 模型跑过」；不认识的检测项只展示，不参与任何结论（问题清单 P0-2）
+  const aiRan = filled.some((s) => s.ok && !s.skipped && !s.error)
   return { ...local, findings, detectors, ai: verdict(findings, "ai", aiRan), edit: verdict(findings, "edit") }
 }

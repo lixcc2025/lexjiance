@@ -24,10 +24,18 @@ AI_TOOL_MARKERS = {
     "hailuo": "海螺 Hailuo", "海螺": "海螺 Hailuo", "minimax": "MiniMax", "vidu": "Vidu", "pixverse": "PixVerse",
     "elevenlabs": "ElevenLabs", "suno": "Suno", "udio": "Udio", "fish audio": "Fish Audio",
     "tongyi": "通义", "通义": "通义", "doubao": "豆包", "豆包": "豆包", "seedance": "Seedance",
-    "stable diffusion": "Stable Diffusion", "comfyui": "ComfyUI", "aigc": "AIGC 标记",
+    "stable diffusion": "Stable Diffusion", "comfyui": "ComfyUI",
 }
-# 只当单词匹配的（太短，容易误中别的词）
-_WORD_ONLY = {"veo", "pika", "luma", "udio", "suno", "sora"}
+# 「AIGC」不在这里按字样匹配：只认国标隐式标识（键名精确匹配或内嵌结构，见 _find_aigc_label）
+
+# 人工填写的字段：谁都能随手写，提到工具名不等于用了这个工具 → 最多「轻微」，并展示原文
+HUMAN_KEYS = {
+    "title", "comment", "description", "synopsis", "artist", "album", "album_artist", "author", "composer",
+    "copyright", "genre", "keywords", "lyrics", "subtitle", "grouping", "show", "network", "performer",
+    "publisher", "purl", "episode_id", "language",
+}
+# 否定语境：「与可灵无关」「not aigc」之类
+NEGATION = re.compile(r"(不是|并非|无关|没有|不含|未使用|未经|并未|非\S{0,3}(生成|合成)|\bnot\b|\bno\b|isn'?t|without|never)", re.I)
 
 # 编辑 / 转码软件
 EDITOR_MARKERS = {
@@ -58,16 +66,48 @@ def _all_tags(media: MediaInfo) -> dict[str, str]:
     return tags
 
 
+def _field(key: str) -> str:
+    """「stream1:handler_name」→「handler_name」；苹果的「com.apple.quicktime.title」→「title」"""
+    f = key.split(":", 1)[-1].lower()
+    return f.rsplit(".", 1)[-1] if f.startswith("com.apple.quicktime.") else f
+
+
+def is_human_field(key: str) -> bool:
+    f = _field(key)
+    return f in HUMAN_KEYS or f.startswith("comment") or f.startswith("description") or f.startswith("title")
+
+
 def _match(text: str, markers: dict[str, str]) -> list[str]:
+    """英文名：短名（≤4 个字母，如 veo、luma）两边都要是单词边界，「luma」不会命中「illuminate」；
+    长名只要求开头是边界，「KlingAI」「JimengAI」这种连写也能命中。中文名按字样匹配"""
     low = text.lower()
     hits = []
     for key, name in markers.items():
-        if key in _WORD_ONLY:
-            if re.search(rf"(?<![a-z]){re.escape(key)}(?![a-z])", low):
+        if key.isascii():
+            tail = "(?![a-z0-9])" if len(key) <= 4 else ""
+            if re.search(rf"(?<![a-z0-9]){re.escape(key)}{tail}", low):
                 hits.append(name)
         elif key in low:
             hits.append(name)
     return sorted(set(hits))
+
+
+def _hits(tags: dict[str, str], markers: dict[str, str]) -> tuple[dict[str, str], dict[str, str], list[str], list[str]]:
+    """按「谁写的」分开：机器写入的字段命中、人工字段命中（排除否定语境）；返回 (机器字段, 人工字段, 机器工具名, 人工工具名)"""
+    machine, human, mn, hn = {}, {}, set(), set()
+    for k, v in tags.items():
+        names = _match(v, markers)
+        if not names:
+            continue
+        if is_human_field(k):
+            if NEGATION.search(v):
+                continue
+            human[k] = v
+            hn.update(names)
+        else:
+            machine[k] = v
+            mn.update(names)
+    return machine, human, sorted(mn), sorted(hn)
 
 
 def _read_head_tail(path: str, size: int) -> bytes:
@@ -103,7 +143,6 @@ class MetadataDetector(Detector):
     def run(self, media: MediaInfo, progress: Progress) -> list[Finding]:
         out: list[Finding] = []
         tags = _all_tags(media)
-        tag_text = "\n".join(f"{k}={v}" for k, v in tags.items())
         progress(0.3, "读取元数据")
         blob = _read_head_tail(media.path, media.size)
 
@@ -128,15 +167,18 @@ class MetadataDetector(Detector):
                                "这个文件里有这类标识，说明它很可能由 AI 生成或经过 AI 合成。",
                                evidence=ev))
 
-        # 2. 标签里的 AI 工具名
-        tools = _match(tag_text, AI_TOOL_MARKERS)
-        if label:
-            tools = [t for t in tools if t != "AIGC 标记"]
-        if tools:
-            out.append(Finding(self.name, AI, "medium" if tools == ["AIGC 标记"] else "high",
-                               "元数据里出现 AI 生成工具：" + "、".join(tools),
-                               "生成工具通常会在导出文件的编码器、软件、注释等字段留下名字。",
-                               evidence={k: v for k, v in tags.items() if _match(f"{k}={v}", AI_TOOL_MARKERS)}))
+        # 2. 标签里的 AI 工具名：机器写入的字段（编码器、软件、处理器名等）才算强信号
+        m_fields, h_fields, m_tools, h_tools = _hits(tags, AI_TOOL_MARKERS)
+        tools = m_tools or h_tools
+        if m_fields:
+            out.append(Finding(self.name, AI, "high", "元数据里出现 AI 生成工具：" + "、".join(m_tools),
+                               "这些名字写在编码器、软件、处理器名这类由程序自动写入的字段里，生成工具导出文件时通常会留下。"
+                               "元数据可以被修改，结合其他检测结果判断。",
+                               evidence={f"字段 {k}": v[:300] for k, v in m_fields.items()}))
+        if h_fields:
+            out.append(Finding(self.name, AI, "low", "标题、注释等人工填写的字段里提到：" + "、".join(h_tools),
+                               "这些字段谁都可以随手填写，提到工具名不等于用了这个工具。下面是原文，请结合内容自己判断。",
+                               evidence={f"字段 {k}": v[:300] for k, v in h_fields.items()}))
 
         # 3. C2PA 内容凭证（只判断有无）
         if b"c2pa" in blob or b"jumbf" in blob:
@@ -147,7 +189,8 @@ class MetadataDetector(Detector):
 
         progress(0.7, "检查设备和软件信息")
         # 4. 编辑 / 转码软件
-        editors = _match(tag_text, EDITOR_MARKERS)
+        # 只看机器写入的字段：标题里写「用剪映剪的」不算软件痕迹
+        e_fields, _, editors, _ = _hits(tags, EDITOR_MARKERS)
         if editors:
             ffmpeg_only = set(editors) == {"FFmpeg"}
             out.append(Finding(self.name, EDIT if not ffmpeg_only else SOURCE, "low" if not ffmpeg_only else "info",
@@ -155,7 +198,7 @@ class MetadataDetector(Detector):
                                "出现剪辑软件说明文件被导出过。注意：微信、QQ 等聊天软件和很多平台传输时会用 FFmpeg 重新编码，"
                                "这本身不是篡改，但会抹掉部分原始痕迹。" if not ffmpeg_only else
                                "文件由 FFmpeg 封装或转码过，聊天软件、平台、转换工具都会这样做，本身不算疑点。",
-                               evidence={k: v for k, v in tags.items() if _match(f"{k}={v}", EDITOR_MARKERS)}))
+                               evidence={f"字段 {k}": v[:300] for k, v in e_fields.items()}))
 
         # 5. 拍摄设备
         dev = {k: v for k, v in tags.items() if k.split(":", 1)[-1].lower() in DEVICE_KEYS}

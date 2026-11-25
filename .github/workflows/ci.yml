@@ -1,0 +1,77 @@
+# 每次推送都跑：引擎测试（Windows + Linux）、桌面端类型检查和单元测试、在 Windows 上打安装包（含运行时自检）
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  engine:
+    name: 引擎测试 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install numpy
+      - name: 装 ffmpeg（Linux）
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: 装 ffmpeg（Windows）
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+      - name: 单元测试
+        working-directory: engine
+        run: python -m unittest -v
+
+  desktop:
+    name: 桌面端检查
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - working-directory: desktop
+        run: npm ci
+      - working-directory: desktop
+        run: npm run check
+      - working-directory: desktop
+        run: npx electron-vite build
+
+  windows-installer:
+    name: Windows 安装包
+    needs: [engine, desktop]
+    runs-on: windows-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: desktop/build/cache
+          key: runtime-${{ hashFiles('desktop/build/runtime.json') }}
+      - working-directory: desktop
+        run: npm ci
+      - name: 打包（含运行时自检）
+        working-directory: desktop
+        run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: desktop/release/*.exe
+          retention-days: 14

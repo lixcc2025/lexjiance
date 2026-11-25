@@ -46,7 +46,15 @@ def _print_text(r) -> None:
         print(f"  {s['title']} — {state}（{s['seconds']} 秒）")
 
 
+def _utf8_stdio() -> None:
+    """引擎的输出给程序读（逐行 JSON），编码固定 UTF-8、换行固定 \n，不跟着系统走（Windows 默认 GBK、\r\n）"""
+    for s in (sys.stdout, sys.stderr):
+        if hasattr(s, "reconfigure"):
+            s.reconfigure(encoding="utf-8", errors="replace", newline="\n")
+
+
 def main(argv=None) -> int:
+    _utf8_stdio()
     p = argparse.ArgumentParser(prog="avengine", description="音视频 AI 生成 / 剪辑痕迹检测引擎")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd", required=True)
