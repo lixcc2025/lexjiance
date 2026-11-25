@@ -20,6 +20,7 @@ class Skip(Exception):
 class Detector:
     name: str = ""
     title: str = ""
+    desc: str = ""          # 一句话说明查什么
     # 适用于哪种文件：video / audio / any
     needs: str = "any"
     # 是否依赖 AI 模型（模型没装时在界面上提示「未安装」，而不是「未发现」）

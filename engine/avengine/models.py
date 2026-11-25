@@ -34,6 +34,7 @@ class DetectorStatus:
     name: str
     title: str
     ok: bool
+    desc: str = ""
     skipped: str = ""      # 没跑的原因（比如没有视频流、模型没装）
     error: str = ""
     seconds: float = 0.0

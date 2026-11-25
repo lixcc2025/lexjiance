@@ -11,7 +11,8 @@ from .base import Detector, Progress, Skip
 
 class AiVoiceDetector(Detector):
     name = "ai_voice"
-    title = "AI 合成语音（声音克隆、TTS）"
+    title = "AI 合成语音"
+    desc = "声音克隆、语音合成"
     needs = "audio"
     uses_model = True
 
@@ -22,7 +23,8 @@ class AiVoiceDetector(Detector):
 
 class AiVideoDetector(Detector):
     name = "ai_video"
-    title = "AI 生成画面（文生视频、换脸）"
+    title = "AI 生成画面"
+    desc = "文生视频、换脸"
     needs = "video"
     uses_model = True
 
@@ -33,7 +35,8 @@ class AiVideoDetector(Detector):
 
 class AudioSpliceDetector(Detector):
     name = "audio_splice"
-    title = "声音剪辑痕迹（底噪突变、电网频率断续、数字静音）"
+    title = "声音剪辑痕迹"
+    desc = "底噪突变、电网频率断续、数字静音"
     needs = "audio"
 
     def run(self, media: MediaInfo, progress: Progress) -> list[Finding]:
@@ -43,7 +46,8 @@ class AudioSpliceDetector(Detector):
 
 class WatermarkDetector(Detector):
     name = "watermark"
-    title = "隐形水印（AudioSeal 等）"
+    title = "隐形水印"
+    desc = "AudioSeal 等 AI 水印"
     uses_model = True
 
     def run(self, media: MediaInfo, progress: Progress) -> list[Finding]:

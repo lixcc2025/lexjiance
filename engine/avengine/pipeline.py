@@ -50,7 +50,7 @@ def analyze(path: str, emit: Optional[Emit] = None, only: Optional[list[str]] = 
         def progress(frac: float, stage: str, _base=base, _span=span, _d=d) -> None:
             emit("progress", {"pct": round(_base + _span * max(0.0, min(1.0, frac)), 3), "stage": f"{_d.title}：{stage}"})
 
-        st = DetectorStatus(name=d.name, title=d.title, ok=True)
+        st = DetectorStatus(name=d.name, title=d.title, desc=d.desc, ok=True)
         t0 = time.monotonic()
         reason = d.applicable(media)
         if reason:

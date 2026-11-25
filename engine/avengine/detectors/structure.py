@@ -53,7 +53,8 @@ def _keyframe_irregular(pk: list[dict[str, Any]]) -> tuple[list[float], Optional
 
 class StructureDetector(Detector):
     name = "structure"
-    title = "封装结构（时间戳断档、关键帧位置、音画时长）"
+    title = "封装结构"
+    desc = "时间戳断档、关键帧位置、音画时长"
 
     def run(self, media: MediaInfo, progress: Progress) -> list[Finding]:
         out: list[Finding] = []
@@ -68,7 +69,7 @@ class StructureDetector(Detector):
                                    f"正常每 {normal * 1000:.0f} 毫秒一个数据包，这里中间空了 {b - a:.2f} 秒。原始录制一般是连续的，"
                                    "跳变常见于删掉一段后直接拼接，也可能是录制设备掉帧、暂停录制。",
                                    modality=s.kind, start=round(a, 3), end=round(b, 3),
-                                   evidence={"前一包": a, "后一包": b, "正常间隔": normal}))
+                                   evidence={"断档前最后一包（秒）": round(a, 3), "断档后第一包（秒）": round(b, 3), "正常间隔（秒）": round(normal, 4)}))
             if len(gaps) > MAX_REPORT:
                 out.append(Finding(self.name, EDIT, "low", f"{label}还有 {len(gaps) - MAX_REPORT} 处时间戳跳变未列出", modality=s.kind))
             if s.kind == "video":
@@ -77,7 +78,7 @@ class StructureDetector(Detector):
                     out.append(Finding(self.name, EDIT, "low", "这里多出一个不在节奏上的关键帧",
                                        f"这个视频的关键帧基本每 {common:.2f} 秒一个，这里提前出现了一个。"
                                        "剪辑拼接、重新录制的接缝处常有这种情况，也可能是画面突变时编码器自动插入。",
-                                       modality="video", start=round(t, 3), evidence={"常规间隔": common}))
+                                       modality="video", start=round(t, 3), evidence={"常规关键帧间隔（秒）": common, "这个关键帧（秒）": round(t, 3)}))
 
         progress(0.9, "比较音画时长")
         if media.video and media.audio:
@@ -85,7 +86,7 @@ class StructureDetector(Detector):
             if dv and da and abs(dv - da) > 1.0:
                 out.append(Finding(self.name, EDIT, "low", f"画面和声音长度差了 {abs(dv - da):.1f} 秒",
                                    "原始录制的音画长度基本一致。差得多可能是后期替换或拼接过声音，也可能是录制设备的问题。",
-                                   evidence={"画面时长": dv, "声音时长": da}))
+                                   evidence={"画面时长（秒）": round(dv, 3), "声音时长（秒）": round(da, 3)}))
         if not out:
             out.append(Finding(self.name, SOURCE, "info", "封装结构没有发现断档",
                                "只说明没有直接拼接的结构痕迹。重新编码导出的剪辑一般看不出来，要靠其他检测项。"))

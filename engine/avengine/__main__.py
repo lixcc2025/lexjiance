@@ -56,12 +56,16 @@ def main(argv=None) -> int:
     g.add_argument("--json", action="store_true")
     g.add_argument("--jsonl", action="store_true")
     a.add_argument("--only", help="只跑这些检测项，逗号分隔")
-    sub.add_parser("detectors", help="列出检测项")
+    dp = sub.add_parser("detectors", help="列出检测项")
+    dp.add_argument("--json", action="store_true")
     args = p.parse_args(argv)
 
     if args.cmd == "detectors":
+        if args.json:
+            print(json.dumps([{"name": c.name, "title": c.title, "desc": c.desc, "needs": c.needs, "uses_model": c.uses_model} for c in ALL], ensure_ascii=False))
+            return 0
         for cls in ALL:
-            print(f"{cls.name:<14} {cls.title}{'（需要模型）' if cls.uses_model else ''}")
+            print(f"{cls.name:<14} {cls.title}：{cls.desc}{'（需要模型）' if cls.uses_model else ''}")
         return 0
 
     def emit_line(kind, payload):

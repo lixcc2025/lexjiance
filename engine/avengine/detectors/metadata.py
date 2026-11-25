@@ -90,7 +90,8 @@ def _find_aigc_label(tags: dict[str, str], blob: bytes) -> tuple[str, str] | Non
 
 class MetadataDetector(Detector):
     name = "metadata"
-    title = "文件元数据（AI 标识、内容凭证、编辑软件、拍摄设备）"
+    title = "文件元数据"
+    desc = "AI 生成标识、内容凭证、编辑软件、拍摄设备"
 
     def run(self, media: MediaInfo, progress: Progress) -> list[Finding]:
         out: list[Finding] = []

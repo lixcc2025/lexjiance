@@ -1,43 +1,73 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue"
-import type { AnalyzeResult, Finding, Severity, Verdict } from "./types"
+import Icon from "./components/Icon.vue"
+import HomeView from "./components/HomeView.vue"
+import MediaPanel from "./components/MediaPanel.vue"
+import VerdictCard from "./components/VerdictCard.vue"
+import FindingList from "./components/FindingList.vue"
+import DetectorList from "./components/DetectorList.vue"
+import { baseName, fmtSize, fmtTime, type AnalyzeResult, type DetectorInfo, type DetectorStatus, type Finding, type HistoryItem } from "./types"
+
+const AUDIO_EXT = /\.(mp3|wav|m4a|aac|amr|flac|ogg|opus|wma)$/i
+const HISTORY_KEY = "avd.history"
 
 const file = ref<string | null>(null)
 const job = ref<string | null>(null)
 const pct = ref(0)
 const stage = ref("")
-const live = ref<Finding[]>([])          // 检测过程中陆续出来的疑点
+const live = ref<Finding[]>([])
 const result = ref<AnalyzeResult | null>(null)
 const error = ref("")
-const showInfo = ref(false)              // 是否显示「说明」类条目
-const expanded = ref<number | null>(null)
+const detectors = ref<DetectorInfo[]>([])
+const status = ref<Record<string, DetectorStatus>>({})
+const active = ref(-1)
 const dragging = ref(false)
-const player = ref<HTMLMediaElement | null>(null)
+const panel = ref<InstanceType<typeof MediaPanel> | null>(null)
+const detOpen = ref(true)   // 检测项清单：检测中展开当进度，出结果后收起
+const history = ref<HistoryItem[]>(loadHistory())
 
 const running = computed(() => !!job.value && !result.value && !error.value)
-const isVideo = computed(() => !!result.value?.media.video || /\.(mp4|mov|m4v|avi|mkv|webm|3gp|flv|ts)$/i.test(file.value || ""))
-const mediaUrl = computed(() => (file.value ? "media://" + encodeURIComponent(file.value) : ""))
-const findings = computed(() => {
-  const all = result.value ? result.value.findings : live.value
-  return showInfo.value ? all : all.filter((f) => f.severity !== "info")
+const findings = computed(() => (result.value ? result.value.findings : live.value))
+const isVideo = computed(() => (result.value ? !!result.value.media.video : !AUDIO_EXT.test(file.value || "")))
+const mediaUrl = computed(() => (file.value ? "media://file/" + encodeURIComponent(file.value) : ""))
+const current = computed(() => detectors.value.find((d) => stage.value.startsWith(d.title + "："))?.name || "")
+const shownDetectors = computed(() => {
+  if (!result.value) return detectors.value
+  // 结果里的顺序和状态为准（包括引擎新加、清单里没有的项）
+  return result.value.detectors.map((s) => detectors.value.find((d) => d.name === s.name) || { name: s.name, title: s.title, desc: s.desc, needs: "any", uses_model: false })
 })
-const marks = computed(() => {
-  const d = result.value?.media.duration
-  if (!d) return []
-  return (result.value?.findings || [])
-    .filter((f) => f.start !== null && f.severity !== "info")
-    .map((f) => ({ f, left: (100 * (f.start as number)) / d, width: f.end !== null ? Math.max(0.6, (100 * ((f.end as number) - (f.start as number))) / d) : 0.6 }))
+const counts = computed(() => ({
+  ai: findings.value.filter((f) => f.category === "ai" && f.severity !== "info").length,
+  edit: findings.value.filter((f) => f.category === "edit" && f.severity !== "info").length,
+}))
+const detSummary = computed(() => {
+  const s = result.value?.detectors || []
+  const done = s.filter((d) => d.ok && !d.skipped).length
+  const skip = s.filter((d) => d.ok && d.skipped).length
+  const err = s.filter((d) => !d.ok).length
+  return [`${done} 项完成`, skip ? `${skip} 项未运行` : "", err ? `${err} 项出错` : ""].filter(Boolean).join(" · ")
+})
+const chips = computed(() => {
+  const m = result.value?.media
+  if (!m) return []
+  const c = [m.format.toUpperCase(), fmtTime(m.duration, false)]
+  if (m.video) c.push(`${m.video.width}×${m.video.height}`, m.video.codec?.toUpperCase())
+  if (m.audio) c.push(`${m.audio.codec?.toUpperCase()} ${m.audio.sample_rate ? Math.round(m.audio.sample_rate / 100) / 10 + "kHz" : ""}`.trim())
+  c.push(fmtSize(m.size))
+  return c.filter(Boolean)
 })
 
-const SEV: Record<Severity, string> = { info: "说明", low: "轻微", medium: "可疑", high: "高度可疑" }
-const CAT: Record<string, string> = { ai: "AI 生成", edit: "剪辑痕迹", source: "来源信息" }
-const LEVEL: Record<Verdict["level"], string> = { none: "未发现", suspicious: "有疑点", likely: "高度可疑", unknown: "无法判断" }
-
-function fmt(t: number | null) {
-  if (t === null) return ""
-  const m = Math.floor(t / 60)
-  const s = t - m * 60
-  return `${String(m).padStart(2, "0")}:${s.toFixed(2).padStart(5, "0")}`
+function loadHistory(): HistoryItem[] {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]") } catch { return [] }
+}
+function saveHistory(r: AnalyzeResult) {
+  const item: HistoryItem = { path: r.file, name: baseName(r.file), time: Date.now(), ai: r.ai.level, edit: r.edit.level, count: r.findings.filter((f) => f.severity !== "info").length }
+  history.value = [item, ...history.value.filter((h) => h.path !== r.file)].slice(0, 20)
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.value))
+}
+function clearHistory() {
+  history.value = []
+  localStorage.removeItem(HISTORY_KEY)
 }
 
 async function start(path: string) {
@@ -46,174 +76,189 @@ async function start(path: string) {
   result.value = null
   error.value = ""
   live.value = []
+  status.value = {}
+  detOpen.value = true
+  active.value = -1
   pct.value = 0
   stage.value = "启动检测引擎"
-  expanded.value = null
+  job.value = null
   const r = await window.avd.analyze(path)
   if (!r.ok) { error.value = r.error || "启动失败"; return }
   job.value = r.job!
 }
-
+async function openFromHistory(path: string) {
+  if (await window.avd.fileExists(path)) start(path)
+  else { file.value = path; result.value = null; job.value = null; error.value = "找不到这个文件，可能已被移动或删除" }
+}
 async function choose() {
   const p = await window.avd.pickFile()
   if (p) start(p)
 }
-
+function goHome() {
+  if (running.value && job.value) window.avd.cancel(job.value)
+  file.value = null
+  job.value = null
+  result.value = null
+  error.value = ""
+}
+function showFolder() { if (file.value) window.avd.showInFolder(file.value) }
+function cancel() { if (job.value) window.avd.cancel(job.value) }
 function onDrop(e: DragEvent) {
   dragging.value = false
   const f = e.dataTransfer?.files?.[0]
   if (f) start(window.avd.pathOf(f))
 }
-
-function cancelJob() {
-  if (job.value) window.avd.cancel(job.value)
-}
-
-function seek(f: Finding) {
-  if (f.start === null || !player.value) return
-  player.value.currentTime = Math.max(0, f.start - 1)   // 往前留 1 秒，方便听 / 看接缝前后
-  player.value.play()
+function seekTo(i: number) {
+  active.value = i
+  const f = findings.value[i]
+  if (f?.start !== null && f?.start !== undefined) panel.value?.seek(Math.max(0, f.start - 1)) // 往前留 1 秒，听 / 看接缝前后
 }
 
 let off: (() => void) | null = null
-onMounted(() => {
+onMounted(async () => {
   window.avd.onOpenFile((p) => start(p))
   off = window.avd.onEvent((ev) => {
     if (ev.job !== job.value) return
     if (ev.type === "progress") { pct.value = ev.pct; stage.value = ev.stage }
     else if (ev.type === "finding") live.value.push(ev as Finding)
-    else if (ev.type === "result") result.value = ev as AnalyzeResult
+    else if (ev.type === "detector") status.value = { ...status.value, [ev.name]: ev as DetectorStatus }
+    else if (ev.type === "result") { result.value = ev as AnalyzeResult; detOpen.value = false; saveHistory(result.value) }
     else if (ev.type === "error") error.value = ev.message
   })
+  detectors.value = await window.avd.listDetectors()
 })
 onUnmounted(() => off && off())
 </script>
 
 <template>
-  <div class="app" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
+  <div class="app" @dragover.prevent="dragging = true" @dragleave.self.prevent="dragging = false" @drop.prevent="onDrop">
     <header>
-      <b>音视频检测</b>
-      <span class="sub">判断是否 AI 生成、有无剪辑痕迹 · 本机离线检测，文件不上传</span>
+      <div class="brand" @click="goHome">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M3 12h2l2-5 3 10 3-12 3 9 2-2h3" /></svg>
+        </div>
+        <div>
+          <div class="name">音视频检测</div>
+          <div class="tagline">AI 生成 · 剪辑痕迹</div>
+        </div>
+      </div>
       <span class="grow" />
-      <button class="primary" @click="choose">选择文件</button>
+      <template v-if="file">
+        <button class="ghost" @click="goHome"><Icon name="back" :size="16" />首页</button>
+        <button v-if="result" @click="showFolder"><Icon name="folder" :size="16" />所在文件夹</button>
+        <button v-if="result || error" @click="start(file!)"><Icon name="refresh" :size="16" />重新检测</button>
+      </template>
+      <button class="primary" @click="choose"><Icon name="upload" :size="16" />{{ file ? "检测其他文件" : "选择文件" }}</button>
     </header>
 
-    <div v-if="!file" class="empty" :class="{ on: dragging }">
-      <p>把视频或音频文件拖到这里，或点右上角「选择文件」</p>
-      <p class="hint">支持 MP4、MOV、AVI、MKV、MP3、WAV、M4A、AMR 等常见格式</p>
-    </div>
+    <HomeView v-if="!file" :history="history" :dragging="dragging" @pick="choose" @open="openFromHistory" @clear="clearHistory" />
 
     <main v-else>
-      <section class="left">
-        <div class="filename" :title="file">{{ file }}</div>
-        <video v-if="isVideo" ref="player" :src="mediaUrl" controls />
-        <audio v-else ref="player" :src="mediaUrl" controls />
-        <div v-if="marks.length" class="timeline" title="红色是疑点位置，点击疑点可跳转">
-          <span v-for="(m, i) in marks" :key="i" class="mark" :class="m.f.severity" :style="{ left: m.left + '%', width: m.width + '%' }" @click="seek(m.f)" />
+      <div class="filebar card">
+        <div class="ficon"><Icon :name="isVideo ? 'video' : 'audio'" :size="22" /></div>
+        <div class="fmeta">
+          <div class="fname" :title="file">{{ baseName(file) }}</div>
+          <div class="fpath" :title="file">{{ file }}</div>
         </div>
-        <div v-if="result" class="meta">
-          <span>格式 {{ result.media.format }}</span>
-          <span>时长 {{ fmt(result.media.duration) }}</span>
-          <span v-if="result.media.video">画面 {{ result.media.video.width }}×{{ result.media.video.height }} {{ result.media.video.codec }}</span>
-          <span v-if="result.media.audio">声音 {{ result.media.audio.codec }} {{ result.media.audio.sample_rate }}Hz</span>
+        <div class="chips num">
+          <span v-for="c in chips" :key="c">{{ c }}</span>
         </div>
-        <div v-if="result" class="detectors">
-          <div class="h">检测项</div>
-          <div v-for="d in result.detectors" :key="d.name" class="det">
-            <span>{{ d.title }}</span>
-            <span :class="d.ok ? (d.skipped ? 'skip' : 'done') : 'err'">{{ !d.ok ? "出错" : d.skipped ? "未运行：" + d.skipped : "完成" }}</span>
-          </div>
-        </div>
-      </section>
+      </div>
 
-      <section class="right">
-        <div v-if="running" class="progress">
-          <div class="bar"><i :style="{ width: pct * 100 + '%' }" /></div>
-          <div class="stage">{{ stage }}</div>
-          <button @click="cancelJob">取消</button>
-        </div>
-        <div v-if="error" class="error">{{ error }}</div>
-
-        <div v-if="result" class="verdicts">
-          <div class="verdict" :class="result.ai.level">
-            <div class="k">AI 生成</div>
-            <div class="v">{{ LEVEL[result.ai.level] }}</div>
-            <div class="t">{{ result.ai.text }}</div>
-          </div>
-          <div class="verdict" :class="result.edit.level">
-            <div class="k">剪辑痕迹</div>
-            <div class="v">{{ LEVEL[result.edit.level] }}</div>
-            <div class="t">{{ result.edit.text }}</div>
-          </div>
-        </div>
-
-        <div class="list-head">
-          <span>疑点 {{ findings.length }}</span>
-          <label><input v-model="showInfo" type="checkbox" /> 显示来源信息</label>
-        </div>
-        <div class="list">
-          <div v-for="(f, i) in findings" :key="i" class="item" :class="f.severity" @click="expanded = expanded === i ? null : i">
-            <div class="row">
-              <span class="sev">{{ SEV[f.severity] }}</span>
-              <span class="cat">{{ CAT[f.category] }}</span>
-              <span class="title">{{ f.title }}</span>
-              <a v-if="f.start !== null" class="time" @click.stop="seek(f)">{{ fmt(f.start) }}<template v-if="f.end !== null"> – {{ fmt(f.end) }}</template> ▶</a>
+      <div class="grid">
+        <div class="col left">
+          <MediaPanel ref="panel" :url="mediaUrl" :is-video="isVideo" :duration="result?.media.duration ?? null"
+            :findings="findings" :active="active" @select="(i) => (active = i)" />
+          <div class="card box">
+            <div class="box-h" :class="{ click: !!result }" @click="result && (detOpen = !detOpen)">
+              <span>检测项</span>
+              <span v-if="result" class="box-sum">{{ detSummary }}<Icon name="chevron" :size="14" :class="{ up: detOpen }" /></span>
             </div>
-            <div v-if="expanded === i" class="more">
-              <p>{{ f.detail }}</p>
-              <pre v-if="Object.keys(f.evidence).length">{{ JSON.stringify(f.evidence, null, 2) }}</pre>
+            <DetectorList v-if="detOpen || !result" :items="shownDetectors" :status="status" :current="current" />
+          </div>
+        </div>
+
+        <div class="col right">
+          <div v-if="error" class="error card">
+            <Icon name="alert" :size="18" />
+            <div><b>检测没有完成</b><div>{{ error }}</div></div>
+          </div>
+
+          <div v-else-if="running || !result" class="progress card">
+            <div class="p-top">
+              <div>
+                <div class="p-label">正在检测</div>
+                <div class="p-stage">{{ stage || "准备中" }}</div>
+              </div>
+              <div class="p-pct num">{{ Math.round(pct * 100) }}<small>%</small></div>
+            </div>
+            <div class="bar"><i :style="{ width: Math.max(2, pct * 100) + '%' }" /></div>
+            <div class="p-foot">
+              <span>已发现 {{ live.filter((f) => f.severity !== "info").length }} 个疑点</span>
+              <button class="ghost small" @click="cancel">取消</button>
             </div>
           </div>
-          <div v-if="result && !findings.length" class="none">没有发现疑点</div>
+
+          <div v-else class="verdicts">
+            <VerdictCard label="AI 生成" icon="sparkles" :verdict="result.ai" :count="counts.ai" />
+            <VerdictCard label="剪辑痕迹" icon="scissors" :verdict="result.edit" :count="counts.edit" />
+          </div>
+
+          <FindingList :findings="findings" :active="active" :live="running" @select="(i) => (active = i)" @seek="seekTo" />
         </div>
-        <p v-if="result" class="note">检测结果是辅助判断的线索，不是鉴定结论。需要作为证据使用时，应委托司法鉴定机构鉴定。</p>
-      </section>
+      </div>
+
+      <footer><Icon name="info" :size="13" />检测结果是辅助判断的线索，不是鉴定结论。需要作为证据使用时，应委托司法鉴定机构鉴定。</footer>
     </main>
+
+    <div v-if="dragging && file" class="drop-mask"><div><Icon name="upload" :size="28" />松开即可检测这个文件</div></div>
   </div>
 </template>
 
 <style scoped>
-.app { height: 100vh; display: flex; flex-direction: column; }
-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #e5e6eb; }
-header .sub { color: #86909c; font-size: 13px; }
+.app { height: 100%; display: flex; flex-direction: column; position: relative; }
+header { display: flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; cursor: pointer; margin-right: 8px; }
+.logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(135deg, #2346a8, #4a74e8); box-shadow: 0 2px 8px rgba(35, 70, 168, .3); }
+.name { font-weight: 650; font-size: 15px; letter-spacing: .5px; }
+.tagline { font-size: 11px; color: var(--muted); }
 .grow { flex: 1; }
-.empty { flex: 1; margin: 24px; border: 2px dashed #c9cdd4; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #4e5969; }
-.empty.on { border-color: #2f5bea; background: #eef2ff; }
-.empty .hint { color: #86909c; font-size: 13px; }
-main { flex: 1; display: flex; gap: 16px; padding: 16px; min-height: 0; }
-.left { flex: 1.2; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: auto; }
-.right { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.filename { font-size: 13px; color: #4e5969; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-video { width: 100%; max-height: 50vh; background: #000; border-radius: 8px; }
-audio { width: 100%; }
-.timeline { position: relative; height: 14px; background: #e5e6eb; border-radius: 7px; }
-.mark { position: absolute; top: 0; height: 14px; border-radius: 3px; cursor: pointer; background: #f7ba1e; }
-.mark.medium { background: #ff7d00; }
-.mark.high { background: #f53f3f; }
-.meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: #4e5969; }
-.detectors { background: #fff; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
-.detectors .h { font-weight: 600; margin-bottom: 6px; }
-.det { display: flex; justify-content: space-between; padding: 3px 0; }
-.det .done { color: #00b42a; } .det .skip { color: #86909c; } .det .err { color: #f53f3f; }
-.progress { background: #fff; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.bar { height: 6px; background: #e5e6eb; border-radius: 3px; overflow: hidden; }
-.bar i { display: block; height: 100%; background: #2f5bea; transition: width .2s; }
-.stage { font-size: 13px; color: #4e5969; }
-.error { background: #ffece8; color: #cb2634; border-radius: 8px; padding: 10px 12px; }
-.verdicts { display: flex; gap: 10px; }
-.verdict { flex: 1; background: #fff; border-radius: 8px; padding: 12px; border-left: 4px solid #c9cdd4; }
-.verdict.none { border-color: #00b42a; } .verdict.suspicious { border-color: #ff7d00; } .verdict.likely { border-color: #f53f3f; }
-.verdict .k { font-size: 13px; color: #86909c; } .verdict .v { font-size: 20px; font-weight: 600; margin: 2px 0; } .verdict .t { font-size: 13px; color: #4e5969; }
-.list-head { display: flex; justify-content: space-between; font-size: 13px; color: #4e5969; }
-.list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.item { background: #fff; border-radius: 8px; padding: 8px 10px; cursor: pointer; border-left: 3px solid #c9cdd4; }
-.item.low { border-color: #f7ba1e; } .item.medium { border-color: #ff7d00; } .item.high { border-color: #f53f3f; }
-.row { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
-.sev, .cat { font-size: 12px; color: #86909c; white-space: nowrap; }
-.title { flex: 1; }
-.time { font-size: 12px; color: #2f5bea; white-space: nowrap; }
-.more p { font-size: 13px; color: #4e5969; margin: 6px 0; }
-.more pre { font-size: 12px; background: #f7f8fa; padding: 8px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; margin: 0; }
-.none { color: #86909c; font-size: 13px; padding: 8px; }
-.note { font-size: 12px; color: #86909c; margin: 0; }
+
+main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px 18px 10px; }
+.filebar { display: flex; align-items: center; gap: 14px; padding: 12px 16px; }
+.ficon { width: 42px; height: 42px; border-radius: 10px; background: var(--brand-weak); color: var(--brand); display: grid; place-items: center; flex: none; }
+.fmeta { min-width: 0; flex: 1; }
+.fname { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fpath { font-size: 12px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 50%; }
+.chips span { font-size: 12px; color: var(--text-2); background: var(--line-2); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
+
+.grid { flex: 1; min-height: 0; display: flex; gap: 14px; }
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 0; }
+.left { flex: 1.2; overflow: auto; }
+.right { flex: 1; }
+.box { padding: 12px 16px 8px; flex: none; }
+.box-h { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; color: var(--text-2); padding-bottom: 4px; }
+.box-h.click { cursor: pointer; }
+.box-sum { display: inline-flex; align-items: center; gap: 4px; font-weight: 400; font-size: 12px; color: var(--muted); }
+.box-sum .up { transform: rotate(180deg); }
+
+.verdicts { display: flex; gap: 12px; }
+.progress { padding: 16px 18px 12px; }
+.p-top { display: flex; justify-content: space-between; align-items: flex-end; }
+.p-label { font-size: 12px; color: var(--muted); }
+.p-stage { font-size: 14px; margin-top: 4px; color: var(--text); }
+.p-pct { font-size: 30px; font-weight: 650; color: var(--brand); line-height: 1; }
+.p-pct small { font-size: 14px; margin-left: 2px; }
+.bar { height: 6px; background: var(--line-2); border-radius: 3px; overflow: hidden; margin: 12px 0 8px; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, #2346a8, #4a74e8); border-radius: 3px; transition: width .3s; }
+.p-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+button.small { height: 26px; padding: 0 10px; font-size: 12px; }
+.error { display: flex; gap: 12px; padding: 14px 16px; color: var(--danger); background: var(--danger-bg); box-shadow: none; }
+.error div div { color: var(--text-2); font-size: 13px; margin-top: 4px; }
+
+footer { display: flex; align-items: center; gap: 6px; justify-content: center; font-size: 12px; color: var(--faint); padding: 2px 0; }
+
+.drop-mask { position: absolute; inset: 0; background: rgba(35, 70, 168, .12); backdrop-filter: blur(2px); display: grid; place-items: center; pointer-events: none; }
+.drop-mask div { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 40px; border-radius: 16px; background: #fff; color: var(--brand); border: 2px dashed var(--brand-2); font-size: 15px; }
 </style>

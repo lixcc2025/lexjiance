@@ -1,5 +1,61 @@
+:root {
+  --brand: #2346a8;
+  --brand-2: #3a63d6;
+  --brand-weak: #eaf0ff;
+  --bg: #f3f5f9;
+  --panel: #ffffff;
+  --line: #e4e8f0;
+  --line-2: #eef1f6;
+  --text: #1a2233;
+  --text-2: #4a5468;
+  --muted: #7c869a;
+  --faint: #a6aebd;
+
+  --ok: #13945a;      --ok-bg: #e7f6ee;
+  --warn: #d97a00;    --warn-bg: #fff3df;
+  --danger: #d23b3b;  --danger-bg: #fdecec;
+  --unknown: #66708a; --unknown-bg: #eef0f5;
+  --low: #c9a000;     --low-bg: #fff9db;
+
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(20, 30, 60, .04), 0 4px 16px rgba(20, 30, 60, .05);
+}
+
 * { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f8; }
-button { font: inherit; cursor: pointer; border: 1px solid #c9cdd4; background: #fff; border-radius: 6px; padding: 6px 14px; }
-button.primary { background: #2f5bea; border-color: #2f5bea; color: #fff; }
+html, body, #app { height: 100%; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-2);
+  transition: background .15s, border-color .15s, color .15s;
+}
+button:hover { border-color: #cfd6e4; color: var(--text); background: #fafbfd; }
+button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+button.primary:hover { background: var(--brand-2); border-color: var(--brand-2); }
+button.ghost { border-color: transparent; background: transparent; }
+button.ghost:hover { background: var(--line-2); }
 button:disabled { opacity: .5; cursor: default; }
+
+.card { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #d6dbe5; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
