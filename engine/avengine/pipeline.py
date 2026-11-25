@@ -8,12 +8,25 @@ from typing import Callable, Optional
 from .detectors import ALL, Skip
 from .models import AI, EDIT, DetectorStatus, Finding, Result
 from .verdict import RANK, verdict
-from .media.probe import probe
+from .media.decode import DecodeError
+from .media.ffrun import FFError
+from .media.probe import ProbeError, probe
+
+KNOWN_ERRORS = (DecodeError, FFError, ProbeError)
 
 # 事件回调：kind 是 progress / finding / detector，payload 是 dict
 Emit = Callable[[str, dict], None]
 
+class UnknownDetector(ValueError):
+    pass
+
+
 def analyze(path: str, emit: Optional[Emit] = None, only: Optional[list[str]] = None) -> Result:
+    if only:
+        unknown = [n for n in only if n not in {cls.name for cls in ALL}]
+        if unknown:
+            # 以前未知名字会静默空跑，结论落到「没有发现剪辑痕迹」
+            raise UnknownDetector(f"没有这些检测项：{', '.join(unknown)}（可用：{', '.join(cls.name for cls in ALL)}）")
     emit = emit or (lambda kind, payload: None)
     path = os.path.abspath(path)
     emit("progress", {"pct": 0.0, "stage": "读取文件结构"})
@@ -43,6 +56,9 @@ def analyze(path: str, emit: Optional[Emit] = None, only: Optional[list[str]] = 
                     emit("finding", f.to_dict())
             except Skip as e:
                 st.skipped = str(e)
+            except KNOWN_ERRORS as e:  # 已知的错误（解码失败、ffmpeg 报错）：直接给人看的话
+                st.ok = False
+                st.error = str(e)[:300]
             except Exception as e:  # 一个检测项出错不影响其他项
                 st.ok = False
                 st.error = f"{type(e).__name__}: {e}"[:300]
@@ -50,7 +66,7 @@ def analyze(path: str, emit: Optional[Emit] = None, only: Optional[list[str]] = 
         statuses.append(st)
         emit("detector", st.__dict__)
 
-    findings.sort(key=lambda f: (-RANK[f.severity], f.start if f.start is not None else -1))
+    findings.sort(key=lambda f: (-RANK.get(f.severity, 0), f.start if f.start is not None else -1))
     # 本机引擎不跑 AI 模型；AI 识别在云端，桌面端合并结果后重算结论
     result = Result(file=path, media=media.summary(), ai=verdict(findings, AI), edit=verdict(findings, EDIT),
                     findings=findings, detectors=statuses)

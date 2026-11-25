@@ -1,0 +1,478 @@
+{
+ "_说明": "结论规则的标准用例：engine/avengine/verdict.py 和 desktop/shared/verdict.ts 都必须逐字一致地通过（问题清单 P0-4、P3-4）",
+ "cases": [
+  {
+   "name": "剪辑：没有疑点",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "info",
+     "start": 1,
+     "end": null,
+     "signal": "ts_gap",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "none",
+    "text": "没有发现剪辑痕迹（重新编码导出的剪辑可能检测不到）"
+   }
+  },
+  {
+   "name": "剪辑：单处时间戳断档",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "medium",
+     "start": 8.0,
+     "end": 14.0,
+     "signal": "ts_gap",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "suspicious",
+    "text": "有可疑的剪辑痕迹（时间戳断档），单一类型的痕迹也可能是录制设备造成，建议对照疑点位置回放核实"
+   }
+  },
+  {
+   "name": "剪辑：屏幕录制式的一串断档（单一类型）",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 1,
+     "end": 1.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 2,
+     "end": 2.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 3,
+     "end": 3.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 4,
+     "end": 4.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 5,
+     "end": 5.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 6,
+     "end": 6.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 7,
+     "end": 7.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 8,
+     "end": 8.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 9,
+     "end": 9.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 10,
+     "end": 10.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 11,
+     "end": 11.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 12,
+     "end": 12.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 13,
+     "end": 13.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 14,
+     "end": 14.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 15,
+     "end": 15.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 16,
+     "end": 16.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 17,
+     "end": 17.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 18,
+     "end": 18.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 19,
+     "end": 19.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 20,
+     "end": 20.4,
+     "signal": "ts_gap",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "suspicious",
+    "text": "有可疑的剪辑痕迹（时间戳断档），单一类型的痕迹也可能是录制设备造成，建议对照疑点位置回放核实"
+   }
+  },
+  {
+   "name": "剪辑：同一位置断档 + 底噪突变 → 互相印证",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "medium",
+     "start": 10.0,
+     "end": 13.0,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 14.5,
+     "end": 14.5,
+     "signal": "noise_floor",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "likely",
+    "text": "同一位置有 2 类证据互相印证（时间戳断档、底噪突变），剪辑痕迹明显，见下方疑点位置"
+   }
+  },
+  {
+   "name": "剪辑：断档和底噪突变离得远 → 不算印证",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "medium",
+     "start": 10.0,
+     "end": 11.0,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 30.0,
+     "end": 30.0,
+     "signal": "noise_floor",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "suspicious",
+    "text": "有可疑的剪辑痕迹（时间戳断档、底噪突变），这几类痕迹不在同一位置，单独看都可能是录制设备造成，建议对照疑点位置回放核实"
+   }
+  },
+  {
+   "name": "剪辑：三类证据同一处",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 5.0,
+     "end": 5.0,
+     "signal": "keyframe",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "medium",
+     "start": 4.0,
+     "end": 6.0,
+     "signal": "ts_gap",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 6.5,
+     "end": 6.5,
+     "signal": "bandwidth",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 40,
+     "end": 40,
+     "signal": "noise_floor",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "likely",
+    "text": "同一位置有 3 类证据互相印证（时间戳断档、关键帧异常、频带突变），剪辑痕迹明显，见下方疑点位置"
+   }
+  },
+  {
+   "name": "剪辑：没有位置的证据不参与印证",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": null,
+     "end": null,
+     "signal": "editor",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": null,
+     "end": null,
+     "signal": "av_length",
+     "detector": "d"
+    },
+    {
+     "category": "edit",
+     "severity": "medium",
+     "start": 3.0,
+     "end": 4.0,
+     "signal": "ts_gap",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "suspicious",
+    "text": "有可疑的剪辑痕迹（时间戳断档、音画时长不一致、剪辑软件痕迹），这几类痕迹不在同一位置，单独看都可能是录制设备造成，建议对照疑点位置回放核实"
+   }
+  },
+  {
+   "name": "剪辑：有 high 直接高度可疑",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "high",
+     "start": null,
+     "end": null,
+     "signal": "cloud:splice",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "likely",
+    "text": "有明显的剪辑痕迹，见下方疑点位置"
+   }
+  },
+  {
+   "name": "剪辑：没有 signal 的用 detector 名，未知类型排在后面",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 2.0,
+     "end": 2.0,
+     "signal": "",
+     "detector": "zzz"
+    },
+    {
+     "category": "edit",
+     "severity": "low",
+     "start": 2.5,
+     "end": 2.5,
+     "signal": "ts_gap",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "likely",
+    "text": "同一位置有 2 类证据互相印证（时间戳断档、zzz），剪辑痕迹明显，见下方疑点位置"
+   }
+  },
+  {
+   "name": "剪辑：未知严重程度不算疑点",
+   "category": "edit",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "edit",
+     "severity": "critical",
+     "start": 1,
+     "end": 2,
+     "signal": "ts_gap",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "none",
+    "text": "没有发现剪辑痕迹（重新编码导出的剪辑可能检测不到）"
+   }
+  },
+  {
+   "name": "AI：高度可疑",
+   "category": "ai",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "ai",
+     "severity": "high",
+     "start": null,
+     "end": null,
+     "signal": "aigc_label",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "likely",
+    "text": "很可能是 AI 生成或经过 AI 合成，见下方疑点"
+   }
+  },
+  {
+   "name": "AI：轻微 → 有疑点",
+   "category": "ai",
+   "ai_models_ran": false,
+   "findings": [
+    {
+     "category": "ai",
+     "severity": "low",
+     "start": null,
+     "end": null,
+     "signal": "ai_tool_human",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "suspicious",
+    "text": "有 AI 生成的迹象，建议进一步核实"
+   }
+  },
+  {
+   "name": "AI：没有疑点、模型没跑 → 无法判断",
+   "category": "ai",
+   "ai_models_ran": false,
+   "findings": [],
+   "expect": {
+    "level": "unknown",
+    "text": "元数据里没有 AI 标识；AI 识别（云端模型）未运行，不能排除 AI 生成"
+   }
+  },
+  {
+   "name": "AI：没有疑点、模型跑了 → 未发现",
+   "category": "ai",
+   "ai_models_ran": true,
+   "findings": [
+    {
+     "category": "ai",
+     "severity": "info",
+     "start": null,
+     "end": null,
+     "signal": "x",
+     "detector": "d"
+    }
+   ],
+   "expect": {
+    "level": "none",
+    "text": "没有发现 AI 生成的迹象（不等于一定是真实录制）"
+   }
+  }
+ ]
+}

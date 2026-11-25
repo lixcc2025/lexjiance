@@ -15,6 +15,7 @@ export interface Finding {
   start: number | null
   end: number | null
   evidence: Record<string, unknown>
+  signal?: string // 证据类型（ts_gap、noise_floor……），结论用它判断不同证据是否互相印证
 }
 export interface Verdict { level: Level; text: string; score: number | null }
 export interface DetectorStatus { name: string; title: string; desc: string; ok: boolean; skipped: string; error: string; seconds: number }

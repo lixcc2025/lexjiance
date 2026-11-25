@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..media.decode import pcm_blocks
+from ..media.decode import DecodeError, pcm_blocks
 
 RATE = 32000          # 分析用采样率：能看到 16kHz 以内的频带
 FRAME = 640           # 20ms
@@ -46,7 +46,7 @@ def _cutoff_hz(power: np.ndarray) -> float:
     return float(edges[above[-1] + 1]) if len(above) else float("nan")
 
 
-def extract(path: str) -> AudioFeatures:
+def extract(path: str, stream_index: int | None = None) -> AudioFeatures:
     frame_db: list[np.ndarray] = []
     win_floor: list[float] = []
     win_cutoff: list[float] = []
@@ -70,7 +70,7 @@ def extract(path: str) -> AudioFeatures:
         else:
             win_cutoff.append(float("nan"))
 
-    for block in pcm_blocks(path, RATE):
+    for block in pcm_blocks(path, RATE, stream_index):
         # 数字静音：找连续为 0 的片段。run_start 记着跨块延续的片段起点
         z = (block == 0).astype(np.int8)
         d = np.diff(np.concatenate((np.array([1 if run_start is not None else 0], dtype=np.int8), z)))
@@ -100,6 +100,9 @@ def extract(path: str) -> AudioFeatures:
     if len(pending_frames) >= WIN_FRAMES // 2:
         flush_window(pending_frames, pending_db)
 
+    if total == 0:
+        # ffprobe 说有声音，ffmpeg 却一个样本也解不出来：是解码失败，不是「声音太短」
+        raise DecodeError("声音解码失败：没有解出任何样本（文件可能损坏，或编码不受支持）")
     return AudioFeatures(
         duration=total / RATE,
         frame_db=np.concatenate(frame_db) if frame_db else np.zeros(0),

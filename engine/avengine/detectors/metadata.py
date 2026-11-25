@@ -55,6 +55,9 @@ AIGC_FIELDS = {
     "ReservedCode1": "预留字段 1", "ReservedCode2": "预留字段 2",
 }
 
+# JUMBF：jumd 描述框里，16 字节类型 + 1 字节开关之后是以 0 结尾的标签；C2PA 的标签是 c2pa
+C2PA_BOX = re.compile(rb"jumd.{17}c2pa\x00", re.S)
+
 SCAN_BYTES = 4 * 1024 * 1024   # 文件头尾各扫 4MB 找内嵌标识（MP4 的 moov 可能在尾部）
 
 
@@ -165,7 +168,7 @@ class MetadataDetector(Detector):
             out.append(Finding(self.name, AI, "high", "文件带有 AI 生成内容的隐式标识",
                                "按《人工智能生成合成内容标识办法》，AI 生成的音视频要在元数据里写入隐式标识。"
                                "这个文件里有这类标识，说明它很可能由 AI 生成或经过 AI 合成。",
-                               evidence=ev))
+                               evidence=ev, signal="aigc_label"))
 
         # 2. 标签里的 AI 工具名：机器写入的字段（编码器、软件、处理器名等）才算强信号
         m_fields, h_fields, m_tools, h_tools = _hits(tags, AI_TOOL_MARKERS)
@@ -174,18 +177,19 @@ class MetadataDetector(Detector):
             out.append(Finding(self.name, AI, "high", "元数据里出现 AI 生成工具：" + "、".join(m_tools),
                                "这些名字写在编码器、软件、处理器名这类由程序自动写入的字段里，生成工具导出文件时通常会留下。"
                                "元数据可以被修改，结合其他检测结果判断。",
-                               evidence={f"字段 {k}": v[:300] for k, v in m_fields.items()}))
+                               evidence={f"字段 {k}": v[:300] for k, v in m_fields.items()}, signal="ai_tool"))
         if h_fields:
             out.append(Finding(self.name, AI, "low", "标题、注释等人工填写的字段里提到：" + "、".join(h_tools),
                                "这些字段谁都可以随手填写，提到工具名不等于用了这个工具。下面是原文，请结合内容自己判断。",
-                               evidence={f"字段 {k}": v[:300] for k, v in h_fields.items()}))
+                               evidence={f"字段 {k}": v[:300] for k, v in h_fields.items()}, signal="ai_tool_human"))
 
-        # 3. C2PA 内容凭证（只判断有无）
-        if b"c2pa" in blob or b"jumbf" in blob:
-            out.append(Finding(self.name, SOURCE, "medium", "文件带有 C2PA 内容凭证",
-                               "内容凭证记录了文件的来源和编辑历史，AI 生成工具（OpenAI、Google、Adobe 等）会写入。"
-                               "需要解析凭证内容才能确定来源（后续版本支持）。",
-                               evidence={}))
+        # 3. C2PA 内容凭证：要有 JUMBF 描述框（jumd）且标签是 c2pa，单纯出现「c2pa」字样不算（问题清单：以前会误报）。
+        #    只判断有无、记为说明；解析签名和内容后续接 c2pa-python
+        if C2PA_BOX.search(blob):
+            out.append(Finding(self.name, SOURCE, "info", "文件可能带有 C2PA 内容凭证",
+                               "内容凭证记录文件的来源和编辑历史，OpenAI、Google、Adobe 等的生成工具会写入。"
+                               "这里只认出了凭证的结构，还没有校验签名和内容（后续版本支持），请勿单独作为依据。",
+                               evidence={}, signal="c2pa"))
 
         progress(0.7, "检查设备和软件信息")
         # 4. 编辑 / 转码软件
@@ -198,7 +202,7 @@ class MetadataDetector(Detector):
                                "出现剪辑软件说明文件被导出过。注意：微信、QQ 等聊天软件和很多平台传输时会用 FFmpeg 重新编码，"
                                "这本身不是篡改，但会抹掉部分原始痕迹。" if not ffmpeg_only else
                                "文件由 FFmpeg 封装或转码过，聊天软件、平台、转换工具都会这样做，本身不算疑点。",
-                               evidence={f"字段 {k}": v[:300] for k, v in e_fields.items()}))
+                               evidence={f"字段 {k}": v[:300] for k, v in e_fields.items()}, signal="editor"))
 
         # 5. 拍摄设备
         dev = {k: v for k, v in tags.items() if k.split(":", 1)[-1].lower() in DEVICE_KEYS}

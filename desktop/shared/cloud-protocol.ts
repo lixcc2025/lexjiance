@@ -51,6 +51,7 @@ export function sanitizeResponse(raw: unknown, duration: number | null): CloudRe
       start: clamp(num(f.start)),
       end: clamp(num(f.end)),
       evidence: f.evidence && typeof f.evidence === "object" ? f.evidence : {},
+      signal: typeof f.signal === "string" && f.signal ? f.signal.slice(0, 40) : `cloud:${String(f.detector || "cloud").slice(0, 30)}`,
     }))
   const detectors: DetectorStatus[] = (Array.isArray(r.detectors) ? r.detectors : [])
     .filter((d: any) => d && typeof d.name === "string")

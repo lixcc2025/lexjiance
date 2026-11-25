@@ -24,6 +24,7 @@ class Finding:
     start: Optional[float] = None      # 疑点位置（秒），没有位置的为空
     end: Optional[float] = None
     evidence: dict[str, Any] = field(default_factory=dict)  # 原始数据，方便复核
+    signal: str = ""                   # 证据类型（如 ts_gap、noise_floor），结论用它判断不同证据是否互相印证
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

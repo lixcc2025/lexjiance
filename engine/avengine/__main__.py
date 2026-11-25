@@ -13,7 +13,7 @@ import sys
 
 from . import __version__
 from .detectors import ALL
-from .pipeline import analyze
+from .pipeline import UnknownDetector, analyze
 from .media.probe import ProbeError
 
 SEV = {"info": "说明", "low": "轻微", "medium": "可疑", "high": "高度可疑"}
@@ -108,11 +108,14 @@ def main(argv=None) -> int:
     only = [x.strip() for x in args.only.split(",")] if args.only else None
     try:
         r = analyze(args.file, emit=emit_line if args.jsonl else None, only=only)
-    except ProbeError as e:
-        if args.jsonl or args.json:
-            print(json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False))
+    except (ProbeError, UnknownDetector) as e:
+        if args.jsonl:
+            emit_line("error", {"message": str(e)})
+        elif args.json:
+            # 和 preview / extract 一样：出错时是 {"error": "..."}
+            print(json.dumps({"error": str(e)}, ensure_ascii=False))
         else:
-            print(f"读不了这个文件：{e}", file=sys.stderr)
+            print(f"读不了这个文件：{e}" if isinstance(e, ProbeError) else str(e), file=sys.stderr)
         return 2
     if args.jsonl:
         emit_line("result", r.to_dict())
@@ -120,6 +123,9 @@ def main(argv=None) -> int:
         print(json.dumps(r.to_dict(), ensure_ascii=False, indent=2))
     else:
         _print_text(r)
+    # 所有检测项都出错：结果不可信，退出码非 0 让调用方知道
+    if r.detectors and all(not d.ok for d in r.detectors):
+        return 3
     return 0
 
 
