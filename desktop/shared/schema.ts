@@ -55,11 +55,14 @@ export type Theme = "system" | "light" | "dark"
 // 设置（存在用户数据目录的 settings.json；云端令牌单独加密保存，不发给页面）
 export interface Settings {
   theme: Theme
-  cloud: { enabled: boolean; url: string; hasToken: boolean }
+  // insecure：地址是公网上的 http 明文；allowInsecure：用户已确认仍要使用
+  cloud: { enabled: boolean; url: string; hasToken: boolean; insecure: boolean; allowInsecure: boolean }
+  keepHistory: boolean // 是否在本机保留检测记录（含文件路径）
 }
 export interface SettingsPatch {
   theme?: Theme
-  cloud?: { enabled?: boolean; url?: string; token?: string | null } // token：null 清除，undefined 不改
+  keepHistory?: boolean
+  cloud?: { enabled?: boolean; url?: string; token?: string | null; allowInsecure?: boolean } // token：null 清除，undefined 不改
 }
 
 export interface AppInfo { platform: string; version: string; titlebar: number }
@@ -80,9 +83,11 @@ export interface Bridge {
   cacheSize(): Promise<number>
   clearCache(): Promise<void>
   openLogs(): Promise<void>
+  clearLogs(): Promise<void>
+  ready(): void // 页面的事件监听都挂好了（之后主进程才把启动时带的文件交过来）
   showInFolder(path: string): Promise<void>
   fileExists(path: string): Promise<boolean>
-  onOpenFile(cb: (path: string) => void): void
-  onMenu(cb: (cmd: string) => void): void
+  onOpenFile(cb: (path: string) => void): () => void
+  onMenu(cb: (cmd: string) => void): () => void
   onEvent(cb: (ev: EngineEvent) => void): () => void
 }

@@ -30,8 +30,12 @@ jobs:
         run: python -m unittest -v
 
   desktop:
-    name: 桌面端检查
-    runs-on: ubuntu-latest
+    name: 桌面端检查 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:

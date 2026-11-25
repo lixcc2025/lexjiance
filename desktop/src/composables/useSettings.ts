@@ -2,7 +2,7 @@
 import { computed, ref } from "vue"
 import type { AppInfo, CloudHealth, Settings, Theme } from "../types"
 
-const settings = ref<Settings>({ theme: "system", cloud: { enabled: false, url: "", hasToken: false } })
+const settings = ref<Settings>({ theme: "system", cloud: { enabled: false, url: "", hasToken: false, insecure: false, allowInsecure: false }, keepHistory: true })
 const info = ref<AppInfo>({ platform: "", version: "", titlebar: 0 })
 let loaded: Promise<void> | null = null
 
@@ -24,11 +24,15 @@ export function useSettings() {
   }
 
   // token：传 undefined 不改，传 "" 或 null 清除
-  async function saveCloud(cloud: { enabled?: boolean; url?: string; token?: string | null }) {
+  async function saveCloud(cloud: { enabled?: boolean; url?: string; token?: string | null; allowInsecure?: boolean }) {
     settings.value = await window.avd.saveSettings({ cloud: { ...cloud, token: cloud.token === "" ? null : cloud.token } })
+  }
+
+  async function setKeepHistory(keep: boolean) {
+    settings.value = await window.avd.saveSettings({ keepHistory: keep })
   }
 
   const testCloud = (): Promise<CloudHealth> => window.avd.testCloud()
 
-  return { settings, info, mac, load, setTheme, saveCloud, testCloud }
+  return { settings, info, mac, load, setTheme, saveCloud, setKeepHistory, testCloud }
 }

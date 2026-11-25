@@ -18,8 +18,19 @@ const api: Bridge = {
   openLogs: () => ipcRenderer.invoke("open-logs"),
   showInFolder: (path) => ipcRenderer.invoke("show-in-folder", path),
   fileExists: (path) => ipcRenderer.invoke("file-exists", path),
-  onOpenFile: (cb) => { ipcRenderer.on("open-file", (_e, p: string) => cb(p)) },
-  onMenu: (cb) => { ipcRenderer.on("menu", (_e, c: string) => cb(c)) },
+  clearLogs: () => ipcRenderer.invoke("clear-logs"),
+  ready: () => ipcRenderer.send("renderer-ready"),
+  // 都返回取消订阅函数，组件重挂载时不会重复注册
+  onOpenFile: (cb) => {
+    const fn = (_e: unknown, p: string) => cb(p)
+    ipcRenderer.on("open-file", fn)
+    return () => { ipcRenderer.removeListener("open-file", fn) }
+  },
+  onMenu: (cb) => {
+    const fn = (_e: unknown, c: string) => cb(c)
+    ipcRenderer.on("menu", fn)
+    return () => { ipcRenderer.removeListener("menu", fn) }
+  },
   onEvent: (cb) => {
     const fn = (_e: unknown, ev: EngineEvent) => cb(ev)
     ipcRenderer.on("engine-event", fn)

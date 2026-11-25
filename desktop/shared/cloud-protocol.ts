@@ -33,14 +33,37 @@ export interface CloudResponse {
 const SEVERITIES = new Set(["info", "low", "medium", "high"])
 const CATEGORIES = new Set(["ai", "edit", "source"])
 
+// 上限（问题清单 P2-8）：故障或恶意的服务器不能把界面撑爆
+export const LIMITS = { findings: 500, detectors: 50, evidenceKeys: 30, evidenceDepth: 2, evidenceChars: 4000, responseBytes: 5 * 1024 * 1024 }
+
+// 依据：最多 30 个键、两层、序列化后 4000 字；超了换成一句说明
+export function cleanEvidence(v: unknown): Record<string, unknown> {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {}
+  const walk = (x: unknown, depth: number): unknown => {
+    if (x === null || typeof x === "number" || typeof x === "boolean") return x
+    if (typeof x === "string") return x.slice(0, 500)
+    if (depth >= LIMITS.evidenceDepth) return "（内容过深，已省略）"
+    if (Array.isArray(x)) return x.slice(0, 20).map((y) => walk(y, depth + 1))
+    if (typeof x === "object") {
+      const o: Record<string, unknown> = {}
+      for (const [k, y] of Object.entries(x as object).slice(0, LIMITS.evidenceKeys)) o[k.slice(0, 60)] = walk(y, depth + 1)
+      return o
+    }
+    return String(x).slice(0, 200)
+  }
+  const out = walk(v, 0) as Record<string, unknown>
+  return JSON.stringify(out).length > LIMITS.evidenceChars ? { 说明: "依据内容过大，已省略" } : out
+}
+
 // 服务器返回的内容不完全可信：字段缺的补默认、类型不对的丢掉，时间限制在文件时长内
 export function sanitizeResponse(raw: unknown, duration: number | null): CloudResponse {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
   const num = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : null)
-  const clamp = (v: number | null) => (v === null ? null : Math.max(0, duration ? Math.min(v, duration) : v))
+  // 时间限制在 0 ~ 时长之间；不知道时长（null）时只限制下限
+  const clamp = (v: number | null) => (v === null ? null : Math.max(0, duration !== null && duration >= 0 ? Math.min(v, duration) : v))
   const findings: Finding[] = (Array.isArray(r.findings) ? r.findings : [])
     .filter((f: any) => f && typeof f.title === "string" && SEVERITIES.has(f.severity) && CATEGORIES.has(f.category))
-    .slice(0, 500)
+    .slice(0, LIMITS.findings)
     .map((f: any) => ({
       detector: String(f.detector || "cloud"),
       category: f.category,
@@ -50,18 +73,19 @@ export function sanitizeResponse(raw: unknown, duration: number | null): CloudRe
       modality: ["file", "video", "audio"].includes(f.modality) ? f.modality : "file",
       start: clamp(num(f.start)),
       end: clamp(num(f.end)),
-      evidence: f.evidence && typeof f.evidence === "object" ? f.evidence : {},
+      evidence: cleanEvidence(f.evidence),
       signal: typeof f.signal === "string" && f.signal ? f.signal.slice(0, 40) : `cloud:${String(f.detector || "cloud").slice(0, 30)}`,
     }))
   const detectors: DetectorStatus[] = (Array.isArray(r.detectors) ? r.detectors : [])
     .filter((d: any) => d && typeof d.name === "string")
+    .slice(0, LIMITS.detectors)
     .map((d: any) => ({
-      name: String(d.name),
-      title: String(d.title || CLOUD_DETECTORS.find((c) => c.name === d.name)?.title || d.name),
-      desc: String(d.desc || CLOUD_DETECTORS.find((c) => c.name === d.name)?.desc || ""),
+      name: String(d.name).slice(0, 40),
+      title: String(d.title || CLOUD_DETECTORS.find((c) => c.name === d.name)?.title || d.name).slice(0, 60),
+      desc: String(d.desc || CLOUD_DETECTORS.find((c) => c.name === d.name)?.desc || "").slice(0, 120),
       ok: d.ok !== false,
-      skipped: String(d.skipped || ""),
-      error: String(d.error || ""),
+      skipped: String(d.skipped || "").slice(0, 120),
+      error: String(d.error || "").slice(0, 300),
       seconds: num(d.seconds) ?? 0,
     }))
   return { findings, detectors }

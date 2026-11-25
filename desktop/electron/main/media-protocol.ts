@@ -1,12 +1,13 @@
 // media:// 本地回放协议：页面用 media://file/<编码后的本机路径> 播放被检测的文件、显示预览素材，不放开 file://。
 // - 注册成 standard + stream，Chromium 的媒体管线才会发分段（Range）请求；大视频、索引在末尾的 MP4 才能播、能拖
-// - 白名单：只放行用户打开过的文件和预览素材目录
+// - 白名单：见 access.ts（只放行可信来源打开的音视频文件和预览素材目录）
 
 import { protocol } from "electron"
 import { createReadStream, statSync } from "fs"
-import { extname, resolve, sep } from "path"
+import { extname } from "path"
 import { Readable } from "stream"
-import { IS_WIN, previewRoot } from "./paths"
+import { Access } from "./access"
+import { previewRoot } from "./paths"
 import { parseRange } from "./range"
 
 const MIME: Record<string, string> = {
@@ -22,14 +23,12 @@ export function registerMediaScheme() {
   protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, bypassCSP: true } }])
 }
 
-const allowed = new Set<string>()
-const norm = (p: string) => (IS_WIN ? resolve(p).toLowerCase() : resolve(p)) // Windows 路径不分大小写
-export function allowPath(p: string) { allowed.add(norm(p)) }
-function isAllowed(p: string) { const r = norm(p); return allowed.has(r) || r.startsWith(norm(previewRoot()) + sep) }
+export const access = new Access(() => [previewRoot()])
 
 function serve(req: Request): Response {
-  const p = decodeURIComponent(new URL(req.url).pathname.slice(1))
-  if (!isAllowed(p)) return new Response("forbidden", { status: 403 })
+  let p: string
+  try { p = decodeURIComponent(new URL(req.url).pathname.slice(1)) } catch { return new Response("bad request", { status: 400 }) }
+  if (!access.isAllowed(p)) return new Response("forbidden", { status: 403 })
   let size: number
   try {
     const st = statSync(p)

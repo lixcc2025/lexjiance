@@ -1,6 +1,6 @@
 // 云端结果：服务器返回的内容不完全可信，清洗后再合并；云端没跑时写明原因
 import { describe, expect, it } from "vitest"
-import { CLOUD_DETECTORS, cloudSkipped, mergeCloud, sanitizeResponse } from "../shared/cloud-protocol"
+import { CLOUD_DETECTORS, LIMITS, cleanEvidence, cloudSkipped, mergeCloud, sanitizeResponse } from "../shared/cloud-protocol"
 import type { AnalyzeResult } from "../shared/schema"
 
 const local: AnalyzeResult = {
@@ -32,6 +32,25 @@ describe("sanitizeResponse", () => {
   it("不是对象也不崩", () => {
     expect(sanitizeResponse(null, 10)).toEqual({ findings: [], detectors: [] })
     expect(sanitizeResponse("x", 10)).toEqual({ findings: [], detectors: [] })
+  })
+})
+
+describe("上限（问题清单 P2-8）", () => {
+  it("检测项最多 50 个、字段截断", () => {
+    const r = sanitizeResponse({ detectors: Array.from({ length: 200 }, (_, i) => ({ name: "d" + i, error: "x".repeat(5000) })) }, 10)
+    expect(r.detectors).toHaveLength(LIMITS.detectors)
+    expect(r.detectors[0].error.length).toBeLessThanOrEqual(300)
+  })
+  it("依据：太深、太大的省略", () => {
+    expect(cleanEvidence({ a: { b: { c: 1 } } })).toEqual({ a: { b: "（内容过深，已省略）" } })
+    expect(cleanEvidence({ big: "x".repeat(100000) })).toEqual({ big: "x".repeat(500) })
+    const many = Object.fromEntries(Array.from({ length: 100 }, (_, i) => ["k" + i, "v".repeat(400)]))
+    expect(cleanEvidence(many)).toEqual({ 说明: "依据内容过大，已省略" })
+    expect(cleanEvidence([1, 2])).toEqual({})
+  })
+  it("时长为 0 也限制时间", () => {
+    const r = sanitizeResponse({ findings: [{ category: "ai", severity: "low", title: "x", start: 5, end: 9 }] }, 0)
+    expect(r.findings[0]).toMatchObject({ start: 0, end: 0 })
   })
 })
 

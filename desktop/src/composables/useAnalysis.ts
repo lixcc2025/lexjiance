@@ -48,7 +48,7 @@ export function useAnalysis() {
     const r = await window.avd.analyze(path)
     if (!r.ok) { error.value = r.error || "启动失败"; return }
     job.value = r.job!
-    window.avd.preview(path).then((p) => { if (file.value === path) preview.value = p })
+    window.avd.preview(path).then((p) => { if (file.value === path) preview.value = p }).catch(() => {})
   }
 
   async function openExisting(path: string) {
@@ -74,6 +74,7 @@ export function useAnalysis() {
     subscribed = true
     window.avd.onEvent(onEvent)
     window.avd.onOpenFile((p) => start(p))
+    window.avd.ready() // 监听挂好了，主进程可以把启动时带的文件交过来了
     detectors.value = await window.avd.listDetectors()
   }
 

@@ -1,17 +1,24 @@
 // 主窗口。
 // macOS：标题栏融进窗口、红绿灯嵌在侧栏上，侧栏用系统半透明材质
 // Windows：自绘标题栏，最小化 / 最大化 / 关闭用系统的「窗口控件覆盖」（titleBarOverlay），颜色跟主题走
+// 安全（问题清单 P2-2）：只允许停留在我们自己的页面（打包后的 index.html 或开发服务器同源），拒绝新窗口和一切权限请求。
+// 启动时带的文件（打开方式）：等页面说「准备好了」再交过去，免得页面还没挂监听就丢了。
 
-import { app, BrowserWindow, nativeTheme, screen } from "electron"
-import { existsSync, writeFileSync } from "fs"
+import { app, BrowserWindow, nativeTheme, screen, session } from "electron"
+import { writeFileSync } from "fs"
 import { resolve } from "path"
+import { pathToFileURL } from "url"
+import { isMediaFile } from "./access"
+import { access } from "./media-protocol"
 import { IS_MAC, preloadPath, rendererIndex } from "./paths"
 import { log } from "./log"
 
 export const TITLEBAR_H = 40
-export const MEDIA_EXT = ["mp4", "mov", "m4v", "avi", "mkv", "webm", "3gp", "flv", "ts", "mp3", "wav", "m4a", "aac", "amr", "flac", "ogg", "opus", "wma"]
+export { MEDIA_EXT } from "./access"
 
 let win: BrowserWindow | null = null
+let rendererReady = false
+let pendingFile: string | null = null
 export const mainWindow = () => (win && !win.isDestroyed() ? win : null)
 
 function overlayColors() {
@@ -27,22 +34,39 @@ export function refreshTitlebar() {
 
 // 命令行里的媒体文件（「打开方式」、拖到程序图标上、第二个实例转过来的）
 export function mediaArg(argv: string[]): string | null {
-  const f = argv.slice(1).reverse().find((a) => !a.startsWith("-") && MEDIA_EXT.some((x) => a.toLowerCase().endsWith("." + x)) && existsSync(a))
+  const f = argv.slice(1).reverse().find((a) => !a.startsWith("-") && isMediaFile(resolve(a)))
   return f ? resolve(f) : null
 }
 
+// 系统交来的文件（可信来源）：加进回放白名单，交给页面；页面还没准备好就先存着
 export function openFileInWindow(path: string) {
+  if (!access.allowMedia(path)) return
   const w = mainWindow()
-  if (!w) return
+  if (!w || !rendererReady) { pendingFile = path; return }
   if (w.isMinimized()) w.restore()
   w.focus()
   w.webContents.send("open-file", path)
+}
+
+export function markRendererReady() {
+  rendererReady = true
+  if (pendingFile) { const f = pendingFile; pendingFile = null; openFileInWindow(f) }
+}
+
+function isOwnUrl(url: string): boolean {
+  try {
+    if (process.env.ELECTRON_RENDERER_URL) return new URL(url).origin === new URL(process.env.ELECTRON_RENDERER_URL).origin
+    return url.split("#")[0] === pathToFileURL(rendererIndex()).href
+  } catch {
+    return false
+  }
 }
 
 export function createMainWindow(): BrowserWindow {
   // 初始大小按屏幕可用区域算；最小 940×560：1366×768 开 125% 缩放、去掉任务栏约 1093×580 也放得下
   const wa = screen.getPrimaryDisplay().workAreaSize
   const fixed = !app.isPackaged && /^(\d+)x(\d+)$/.exec(process.env.AVD_WINDOW_SIZE || "") // 开发用：固定窗口大小检查小屏布局
+  rendererReady = false
   win = new BrowserWindow({
     width: fixed ? Number(fixed[1]) : Math.min(1360, Math.round(wa.width * 0.94)),
     height: fixed ? Number(fixed[2]) : Math.min(860, Math.round(wa.height * 0.94)),
@@ -57,13 +81,16 @@ export function createMainWindow(): BrowserWindow {
     webPreferences: { preload: preloadPath(), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   win.once("ready-to-show", () => win?.show())
-  // 不允许页面打开新窗口或跳到外部网址
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }))
-  win.webContents.on("will-navigate", (e, url) => { if (!url.startsWith("file:") && !url.startsWith(process.env.ELECTRON_RENDERER_URL || "\0")) e.preventDefault() })
+  win.webContents.on("will-navigate", (e, url) => { if (!isOwnUrl(url)) { e.preventDefault(); log.warn("拦截了页面跳转") } })
+  win.webContents.on("will-redirect", (e, url) => { if (!isOwnUrl(url)) e.preventDefault() })
   win.webContents.on("render-process-gone", (_e, d) => log.error("页面进程退出", d))
+  // 摄像头、麦克风、通知、地理位置……一律不给
+  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
+  session.defaultSession.setPermissionCheckHandler(() => false)
 
   const arg = mediaArg(process.argv)
-  if (arg) win.webContents.once("did-finish-load", () => win?.webContents.send("open-file", arg))
+  if (arg) openFileInWindow(arg)
   devSnapshot(win)
 
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)

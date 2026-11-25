@@ -1,0 +1,5 @@
+Copyright © 2026 lixcc2025. 保留所有权利。
+
+本仓库的源代码、文档、图标仅供项目成员开发使用，未经书面许可，不得复制、修改、分发或用于商业用途。
+
+第三方组件（Electron、Vue、Python、NumPy、FFmpeg 等）按各自的许可证使用，打包后的许可证文本在安装目录 resources/licenses/ 下。

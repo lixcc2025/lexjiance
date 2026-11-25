@@ -4,14 +4,32 @@ import { onMounted, ref } from "vue"
 import Icon from "../common/Icon.vue"
 import { fmtSize, type CloudHealth, type Theme } from "../../types"
 import { useSettings } from "../../composables/useSettings"
+import { useHistory } from "../../composables/useHistory"
+import { computed } from "vue"
 
 const emit = defineEmits<{ (e: "close"): void }>()
-const { settings, info, setTheme, saveCloud, testCloud } = useSettings()
+const { settings, info, setTheme, saveCloud, setKeepHistory, testCloud } = useSettings()
+const { clear: clearHistory } = useHistory()
 
 const tab = ref<"look" | "cloud" | "storage" | "about">("look")
 const url = ref(settings.value.cloud.url)
 const token = ref("")
 const enabled = ref(settings.value.cloud.enabled)
+const allowInsecure = ref(settings.value.cloud.allowInsecure)
+// 公网上的 http 明文地址（和主进程 url-policy.ts 的判断一致，这里只用来提前提示）
+const insecure = computed(() => {
+  try {
+    const u = new URL(url.value.trim())
+    if (u.protocol !== "http:") return false
+    const h = u.hostname.replace(/^\[|\]$/g, "").toLowerCase()
+    if (h === "localhost" || h.endsWith(".local") || h === "::1" || /^f[cd][0-9a-f]{2}:/.test(h)) return false
+    const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(h)
+    if (!m) return true
+    const a = Number(m[1]), b = Number(m[2])
+    return !(a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168))
+  } catch { return false }
+})
+const logsCleared = ref(false)
 const saving = ref(false)
 const msg = ref<{ ok: boolean; text: string } | null>(null)
 const health = ref<CloudHealth | null>(null)
@@ -24,7 +42,7 @@ async function save() {
   saving.value = true
   msg.value = null
   try {
-    await saveCloud({ url: url.value, enabled: enabled.value, token: token.value ? token.value : undefined })
+    await saveCloud({ url: url.value, enabled: enabled.value, allowInsecure: insecure.value ? allowInsecure.value : false, token: token.value ? token.value : undefined })
     token.value = ""
     msg.value = { ok: true, text: "已保存" }
   } catch (e: any) {
@@ -42,6 +60,11 @@ async function test() {
   testing.value = false
 }
 const openLogs = () => window.avd.openLogs()
+async function clearLogs() { await window.avd.clearLogs(); logsCleared.value = true }
+async function onKeepHistory(keep: boolean) {
+  await setKeepHistory(keep)
+  if (!keep) clearHistory()
+}
 async function refreshCache() { cache.value = await window.avd.cacheSize() }
 async function clearCache() { await window.avd.clearCache(); await refreshCache() }
 
@@ -81,6 +104,10 @@ onMounted(refreshCache)
             <span>访问令牌</span>
             <input v-model="token" type="password" class="selectable" :placeholder="settings.cloud.hasToken ? '已保存（留空不修改）' : '服务器要求时填写'" />
           </label>
+          <div v-if="insecure" class="warn">
+            <b>这是公网上的 http 明文地址。</b>访问令牌和上传的音轨、截图在网络上不加密，可能被截获。请让服务方提供 https 地址。
+            <label class="sw"><input v-model="allowInsecure" type="checkbox" /><span>我了解风险，仍然使用这个地址</span></label>
+          </div>
           <div class="row">
             <button class="primary" :disabled="saving" @click="save">保存</button>
             <button :disabled="testing || !url" @click="test"><Icon name="refresh" :size="13" />{{ testing ? "测试中…" : "测试连接" }}</button>
@@ -97,9 +124,16 @@ onMounted(refreshCache)
           <h3>预览缓存</h3>
           <p class="hint">时间轴的缩略帧、波形、频谱图会缓存起来，同一个文件再打开时不用重算。缓存在系统临时目录，可以随时清理。</p>
           <div class="row"><span class="num big">{{ cache === null ? "…" : fmtSize(cache) }}</span><button @click="clearCache">清理缓存</button></div>
+          <h3>检测记录</h3>
+          <p class="hint">侧栏的检测记录保存在本机，包含文件路径和结论，方便再次打开。多人共用的电脑可以关掉。</p>
+          <label class="sw"><input type="checkbox" :checked="settings.keepHistory" @change="onKeepHistory(($event.target as HTMLInputElement).checked)" /><span>保留检测记录</span></label>
           <h3>日志</h3>
-          <p class="hint">软件出问题时，把日志文件发给技术支持。日志里只有文件路径和出错信息，没有检测内容。</p>
-          <div class="row"><button @click="openLogs"><Icon name="external" :size="13" />打开日志目录</button></div>
+          <p class="hint">软件出问题时，把日志文件发给技术支持。日志只记文件名和出错信息，不记完整路径和检测内容。</p>
+          <div class="row">
+            <button @click="openLogs"><Icon name="external" :size="13" />打开日志目录</button>
+            <button class="flat" @click="clearLogs">清除日志</button>
+            <span v-if="logsCleared" class="msg">已清除</span>
+          </div>
         </section>
 
         <section v-else>
@@ -136,6 +170,9 @@ h3 { font-size: 13px; margin: 6px 0 8px; }
 .row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .msg { font-size: 12px; color: var(--ok); }
 .msg.bad { color: var(--danger); }
+.warn { font-size: 12px; line-height: 1.7; color: var(--text-2); background: var(--warn-bg); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.warn b { color: var(--warn); }
+.warn .sw { margin: 8px 0 0; }
 .health { display: flex; gap: 8px; align-items: center; padding: 9px 12px; border-radius: 8px; font-size: 12px; color: var(--ok); background: var(--ok-bg); }
 .health.bad { color: var(--danger); background: var(--danger-bg); }
 .big { font-size: 18px; min-width: 90px; }
