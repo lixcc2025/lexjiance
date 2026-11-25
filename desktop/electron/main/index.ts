@@ -1,8 +1,9 @@
 // 主进程：窗口、选文件、调检测引擎（Python 子进程，逐行 JSON 事件）、本地媒体回放协议。
 // 全程离线：文件不上传，引擎在本机跑（法院、检察院多在内网）。
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, shell } from "electron"
 import { spawn, execFile, ChildProcess } from "child_process"
-import { createReadStream, existsSync, statSync } from "fs"
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs"
+import { createHash } from "crypto"
 import { Readable } from "stream"
 import { extname, join, resolve } from "path"
 
@@ -28,13 +29,17 @@ function engineCommand(): { cmd: string; cwd: string } {
 }
 
 function createWindow() {
+  const mac = process.platform === "darwin"
   win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    width: 1360,
+    height: 860,
+    minWidth: 1080,
+    minHeight: 680,
     title: "音视频检测",
-    backgroundColor: "#f4f6fa",
+    // macOS：标题栏融进窗口、红绿灯嵌在侧栏上，侧栏用系统半透明材质
+    ...(mac
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 18, y: 20 }, vibrancy: "sidebar" as const, visualEffectState: "active" as const, backgroundColor: "#00000000" }
+      : { backgroundColor: "#14161b" }),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -45,6 +50,23 @@ function createWindow() {
   // 用「打开方式」或命令行带文件启动：页面加载完直接开始检测
   const argFile = process.argv.slice(1).reverse().find((a) => !a.startsWith("-") && MEDIA_EXT.some((x) => a.toLowerCase().endsWith("." + x)) && existsSync(a))
   if (argFile) win.webContents.once("did-finish-load", () => win?.webContents.send("open-file", resolve(argFile)))
+  // 开发用截图（打包版不生效）：AVD_SNAPSHOT=输出.png，AVD_SNAPSHOT_DELAY=毫秒，AVD_SNAPSHOT_JS=截图前在页面里执行的脚本
+  if (!app.isPackaged && process.env.AVD_SNAPSHOT) {
+    const out = process.env.AVD_SNAPSHOT
+    win.webContents.once("did-finish-load", () => {
+      setTimeout(async () => {
+        try {
+          if (process.env.AVD_SNAPSHOT_JS) await win?.webContents.executeJavaScript(process.env.AVD_SNAPSHOT_JS, true)
+          await new Promise((r) => setTimeout(r, Number(process.env.AVD_SNAPSHOT_AFTER_JS || 800)))
+          const img = await win!.webContents.capturePage()
+          writeFileSync(out, img.toPNG())
+        } catch (e) {
+          console.error("snapshot failed", e)
+        }
+        if (process.env.AVD_SNAPSHOT_QUIT !== "0") app.quit()
+      }, Number(process.env.AVD_SNAPSHOT_DELAY || 4000))
+    })
+  }
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else win.loadFile(join(__dirname, "../renderer/index.html"))
 }
@@ -61,6 +83,7 @@ ipcMain.handle("pick-file", async () => {
 // 开始检测：返回任务号；事件通过 engine-event 推给渲染进程
 ipcMain.handle("analyze", (_e, file: string) => {
   if (typeof file !== "string" || !existsSync(file)) return { ok: false, error: "文件不存在" }
+  allow(file)
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   const { cmd, cwd } = engineCommand()
   const child = spawn(cmd, ["-m", "avengine", "analyze", file, "--jsonl"], {
@@ -107,6 +130,38 @@ ipcMain.handle("list-detectors", () => new Promise((res) => {
     (err, out) => { try { res(err ? [] : JSON.parse(String(out))) } catch { res([]) } })
 }))
 
+// media:// 只放行用户打开过的文件和预览素材目录，不能拿它读本机其他文件
+const allowed = new Set<string>()
+const PREVIEW_ROOT = join(app.getPath("temp"), "avdetect-preview")
+function allow(p: string) { allowed.add(resolve(p)) }
+function isAllowed(p: string) { const r = resolve(p); return allowed.has(r) || r.startsWith(PREVIEW_ROOT + (process.platform === "win32" ? "\\" : "/")) }
+
+// 时间轴预览素材（缩略帧、波形、频谱图）：按「路径 + 大小 + 修改时间」缓存，同一个文件第二次打开不重算
+ipcMain.handle("preview", (_e, file: string) => new Promise((res) => {
+  if (typeof file !== "string" || !existsSync(file)) return res(null)
+  const st = statSync(file)
+  const key = createHash("sha1").update(`${resolve(file)}|${st.size}|${st.mtimeMs}`).digest("hex").slice(0, 16)
+  const dir = join(PREVIEW_ROOT, key)
+  const cache = join(dir, "preview.json")
+  if (existsSync(cache)) { try { return res(JSON.parse(readFileSync(cache, "utf8"))) } catch { /* 坏缓存重算 */ } }
+  mkdirSync(dir, { recursive: true })
+  const { cmd, cwd } = engineCommand()
+  execFile(cmd, ["-m", "avengine", "preview", file, "--out", dir], { cwd, windowsHide: true, timeout: 600000, maxBuffer: 16 << 20, env: { ...process.env, PYTHONUTF8: "1" } },
+    (err, out) => {
+      try {
+        const r = JSON.parse(String(out))
+        if (r.error) return res(null)
+        writeFileSync(cache, JSON.stringify(r))
+        res(r)
+      } catch { res(null) }
+    })
+}))
+
+// 主题：跟随系统 / 浅色 / 深色。改 nativeTheme 会同时影响 macOS 侧栏材质和页面的 prefers-color-scheme
+ipcMain.handle("set-theme", (_e, t: string) => { nativeTheme.themeSource = t === "light" || t === "dark" ? t : "system" })
+
+ipcMain.handle("app-info", () => ({ platform: process.platform, version: app.getVersion() }))
+
 ipcMain.handle("show-in-folder", (_e, p: string) => { if (typeof p === "string" && existsSync(p)) shell.showItemInFolder(p) })
 
 ipcMain.handle("file-exists", (_e, p: string) => typeof p === "string" && existsSync(p))
@@ -123,9 +178,11 @@ const MIME: Record<string, string> = {
   ".avi": "video/x-msvideo", ".3gp": "video/3gpp", ".ts": "video/mp2t", ".flv": "video/x-flv",
   ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", ".aac": "audio/aac", ".flac": "audio/flac",
   ".ogg": "audio/ogg", ".opus": "audio/ogg", ".amr": "audio/amr", ".wma": "audio/x-ms-wma",
+  ".png": "image/png", ".jpg": "image/jpeg",
 }
 function serveMedia(req: Request): Response {
   const p = decodeURIComponent(new URL(req.url).pathname.slice(1))
+  if (!isAllowed(p)) return new Response("forbidden", { status: 403 })
   let size: number
   try {
     const st = statSync(p)
@@ -152,7 +209,15 @@ function serveMedia(req: Request): Response {
 }
 
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(null) // 不要 Electron 默认的英文菜单
+  // macOS 要有应用菜单，复制粘贴、退出这些快捷键才能用；其他平台不要菜单栏
+  if (process.platform === "darwin") {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: "音视频检测", submenu: [{ role: "about", label: "关于" }, { type: "separator" }, { role: "hide", label: "隐藏" }, { role: "quit", label: "退出" }] },
+      { label: "文件", submenu: [{ label: "打开…", accelerator: "CmdOrCtrl+O", click: () => win?.webContents.send("menu", "open") }, { role: "close", label: "关闭窗口" }] },
+      { label: "编辑", submenu: [{ role: "copy", label: "拷贝" }, { role: "paste", label: "粘贴" }, { role: "selectAll", label: "全选" }] },
+      { label: "窗口", submenu: [{ role: "minimize", label: "最小化" }, { role: "zoom", label: "缩放" }, { role: "togglefullscreen", label: "全屏" }] },
+    ]))
+  } else Menu.setApplicationMenu(null)
   protocol.handle("media", (req) => serveMedia(req))
   createWindow()
 })

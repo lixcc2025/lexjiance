@@ -40,6 +40,13 @@ EDITOR_MARKERS = {
 DEVICE_KEYS = ("com.apple.quicktime.make", "com.apple.quicktime.model", "make", "model",
                "com.android.manufacturer", "com.android.model", "com.apple.quicktime.software")
 
+# 隐式标识里的字段（TODO：按 GB 45438-2025 原文核对字段名和含义）
+AIGC_FIELDS = {
+    "Label": "生成合成标签", "ContentProducer": "生成合成服务提供者", "ProduceID": "内容制作编号",
+    "ContentPropagator": "传播服务提供者", "PropagateID": "内容传播编号",
+    "ReservedCode1": "预留字段 1", "ReservedCode2": "预留字段 2",
+}
+
 SCAN_BYTES = 4 * 1024 * 1024   # 文件头尾各扫 4MB 找内嵌标识（MP4 的 moov 可能在尾部）
 
 
@@ -104,10 +111,22 @@ class MetadataDetector(Detector):
         label = _find_aigc_label(tags, blob)
         if label:
             where, value = label
+            ev: dict = {"位置": where}
+            try:
+                fields = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                fields = None
+            if isinstance(fields, dict):
+                for k, v in fields.items():
+                    if v in ("", None):
+                        continue
+                    ev[AIGC_FIELDS.get(k, k)] = v
+            else:
+                ev["内容"] = value[:500]
             out.append(Finding(self.name, AI, "high", "文件带有 AI 生成内容的隐式标识",
                                "按《人工智能生成合成内容标识办法》，AI 生成的音视频要在元数据里写入隐式标识。"
                                "这个文件里有这类标识，说明它很可能由 AI 生成或经过 AI 合成。",
-                               evidence={"位置": where, "内容": value[:500]}))
+                               evidence=ev))
 
         # 2. 标签里的 AI 工具名
         tools = _match(tag_text, AI_TOOL_MARKERS)

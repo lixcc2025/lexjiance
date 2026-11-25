@@ -33,6 +33,12 @@ export interface AnalyzeResult {
   findings: Finding[]
   detectors: DetectorStatus[]
 }
+export interface Preview {
+  duration: number
+  waveform: number[]
+  spectrogram: string | null
+  frames: { t: number; path: string }[]
+}
 export interface HistoryItem { path: string; name: string; time: number; ai: Level; edit: Level; count: number }
 
 declare global {
@@ -43,6 +49,10 @@ declare global {
       analyze(file: string): Promise<{ ok: boolean; job?: string; error?: string }>
       cancel(job: string): Promise<boolean>
       listDetectors(): Promise<DetectorInfo[]>
+      preview(path: string): Promise<Preview | null>
+      setTheme(t: string): Promise<void>
+      appInfo(): Promise<{ platform: string; version: string }>
+      onMenu(cb: (cmd: string) => void): void
       showInFolder(path: string): Promise<void>
       fileExists(path: string): Promise<boolean>
       onOpenFile(cb: (path: string) => void): void
@@ -74,3 +84,7 @@ export function fmtSize(n: number): string {
 export function baseName(p: string): string {
   return p.split(/[\\/]/).pop() || p
 }
+
+export const mediaUrl = (p: string) => "media://file/" + encodeURIComponent(p)
+export const SEV_COLOR: Record<Severity, string> = { info: "var(--unknown)", low: "var(--low)", medium: "var(--warn)", high: "var(--danger)" }
+export const LEVEL_TONE: Record<Level, string> = { none: "ok", suspicious: "warn", likely: "danger", unknown: "unknown" }

@@ -81,7 +81,8 @@ class EngineTest(unittest.TestCase):
         r, _ = self.run_on("aigc.mp3")
         hit = [f for f in r.findings if f.category == AI and "隐式标识" in f.title]
         self.assertEqual(len(hit), 1, [f.title for f in r.findings])
-        self.assertIn("测试生成服务", hit[0].evidence["内容"])
+        self.assertEqual(hit[0].evidence["生成合成服务提供者"], "测试生成服务")
+        self.assertEqual(hit[0].evidence["内容制作编号"], "abc123")
         self.assertEqual(r.ai.level, "likely")
 
     def test_ai_tool_name(self):
@@ -103,6 +104,23 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(lines[-1]["type"], "result")
         self.assertEqual(lines[-1]["edit"]["level"], "suspicious")
         self.assertTrue(any(x["type"] == "progress" for x in lines))
+
+    def test_preview(self):
+        from avengine.preview import make_preview
+        out = os.path.join(self.dir, "pv")
+        r = make_preview(os.path.join(self.dir, "clean.mp4"), out)
+        self.assertAlmostEqual(r["duration"], 6.0, delta=0.1)
+        self.assertGreater(len(r["waveform"]), 1000)
+        self.assertTrue(all(0 <= v <= 1 for v in r["waveform"]))
+        self.assertTrue(r["spectrogram"] and os.path.isfile(r["spectrogram"]))
+        self.assertEqual(len(r["frames"]), 24)
+        self.assertTrue(all(os.path.isfile(f["path"]) for f in r["frames"]))
+        a = make_preview(os.path.join(self.dir, "voice.wav"), os.path.join(self.dir, "pv2"))
+        self.assertEqual(a["frames"], [])
+        self.assertTrue(a["waveform"] and a["spectrogram"])
+        v = make_preview(os.path.join(self.dir, "gap.mp4"), os.path.join(self.dir, "pv3"))   # 没有声音
+        self.assertEqual(v["waveform"], [])
+        self.assertIsNone(v["spectrogram"])
 
     def test_bad_file(self):
         p = os.path.join(self.dir, "not_media.mp4")

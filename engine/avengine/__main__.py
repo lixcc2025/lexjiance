@@ -56,6 +56,9 @@ def main(argv=None) -> int:
     g.add_argument("--json", action="store_true")
     g.add_argument("--jsonl", action="store_true")
     a.add_argument("--only", help="只跑这些检测项，逗号分隔")
+    pv = sub.add_parser("preview", help="生成时间轴预览素材（缩略帧、波形、频谱图），打印 JSON")
+    pv.add_argument("file")
+    pv.add_argument("--out", required=True, help="素材输出目录")
     dp = sub.add_parser("detectors", help="列出检测项")
     dp.add_argument("--json", action="store_true")
     args = p.parse_args(argv)
@@ -66,6 +69,15 @@ def main(argv=None) -> int:
             return 0
         for cls in ALL:
             print(f"{cls.name:<14} {cls.title}：{cls.desc}{'（需要模型）' if cls.uses_model else ''}")
+        return 0
+
+    if args.cmd == "preview":
+        from .preview import make_preview
+        try:
+            print(json.dumps(make_preview(args.file, args.out), ensure_ascii=False))
+        except Exception as e:  # 预览失败不影响检测，桌面端只是不显示素材
+            print(json.dumps({"error": str(e)}, ensure_ascii=False))
+            return 2
         return 0
 
     def emit_line(kind, payload):
