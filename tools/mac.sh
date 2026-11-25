@@ -8,7 +8,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 case "$1" in
   sync)
     cd "$ROOT"
-    tar czf - --exclude=node_modules --exclude=out --exclude=__pycache__ --exclude=.git . | ssh local 'mkdir -p ~/avdetect && cd ~/avdetect && tar xzf -'
+    tar czf - --exclude=node_modules --exclude=out --exclude=__pycache__ --exclude=.venv --exclude=.git . | ssh local 'mkdir -p ~/avdetect && cd ~/avdetect && tar xzf -'
     ssh local 'export PATH=$HOME/local/node/bin:$PATH && cd ~/avdetect/desktop && npx electron-vite build 2>&1 | grep -E "rror|built in" | tail -3'
     ;;
   shot)

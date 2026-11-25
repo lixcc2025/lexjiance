@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import array
 import os
-import shutil
 import subprocess
 from typing import Any, Optional
 
-from .probe import probe
+from .media.probe import probe
+from .media.tools import ffmpeg_bin, popen_kwargs
 
 WAVE_BINS = 1800        # 波形分多少段（界面再按宽度合并）
 WAVE_RATE = 8000        # 算波形时先降到 8kHz 单声道
@@ -19,15 +19,8 @@ SPEC_RATE = 16000       # 频谱只看到 8kHz（人声主要在这个范围）�
 FRAMES = 24             # 缩略帧数量
 
 
-def ffmpeg_bin() -> str:
-    p = os.environ.get("AVENGINE_FFMPEG") or shutil.which("ffmpeg")
-    if not p:
-        raise RuntimeError("找不到 ffmpeg")
-    return p
-
-
 def _run(args: list[str], timeout: float = 300) -> subprocess.CompletedProcess:
-    return subprocess.run([ffmpeg_bin(), "-v", "error", "-nostdin", "-y", *args], capture_output=True, timeout=timeout)
+    return subprocess.run([ffmpeg_bin(), "-v", "error", "-nostdin", "-y", *args], capture_output=True, timeout=timeout, **popen_kwargs())
 
 
 def waveform(path: str, duration: float) -> list[float]:
@@ -35,7 +28,7 @@ def waveform(path: str, duration: float) -> list[float]:
     total = max(1, int(duration * WAVE_RATE))
     per = max(1, total // WAVE_BINS)
     proc = subprocess.Popen([ffmpeg_bin(), "-v", "error", "-nostdin", "-i", path, "-vn", "-ac", "1", "-ar", str(WAVE_RATE),
-                             "-f", "s16le", "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                             "-f", "s16le", "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, **popen_kwargs())
     peaks: list[int] = []
     buf = array.array("h")
     assert proc.stdout

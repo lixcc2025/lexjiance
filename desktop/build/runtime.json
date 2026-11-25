@@ -1,0 +1,34 @@
+{
+  "_说明": "打包时随软件一起带的运行时。scripts/prepare-runtime.mjs 按这里下载、校验、组装到 build/runtime/<平台>-<架构>/。升级版本改这里。",
+  "numpy": "2.1.3",
+  "python": {
+    "win32-x64": {
+      "url": "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip",
+      "sha256": "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b",
+      "pth": "python311._pth",
+      "wheelTag": "cp311-cp311-win_amd64",
+      "sitePackages": "Lib/site-packages"
+    },
+    "darwin-arm64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.11.18+20261124-aarch64-apple-darwin-install_only.tar.gz",
+      "sums": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/SHA256SUMS",
+      "wheelTag": "cp311-cp311-macosx_14_0_arm64",
+      "sitePackages": "lib/python3.11/site-packages"
+    },
+    "darwin-x64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.11.18+20261124-x86_64-apple-darwin-install_only.tar.gz",
+      "sums": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/SHA256SUMS",
+      "wheelTag": "cp311-cp311-macosx_10_13_x86_64",
+      "sitePackages": "lib/python3.11/site-packages"
+    }
+  },
+  "ffmpeg": {
+    "win32-x64": {
+      "_说明": "BtbN 的 LGPL 动态链接版（LGPL 可随闭源软件分发；不要换成 gpl 版）。latest 会随上游更新，下载后缓存在 build/cache，想固定版本就保留缓存文件",
+      "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip",
+      "sums": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256"
+    },
+    "darwin-arm64": { "_说明": "macOS 没有固定的 LGPL 官方构建：用环境变量 FFMPEG_DIR 指向放有 ffmpeg、ffprobe 的目录", "env": "FFMPEG_DIR" },
+    "darwin-x64": { "env": "FFMPEG_DIR" }
+  }
+}

@@ -1,23 +1,31 @@
 {
   "name": "avdetect-desktop",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "音视频 AI 生成 / 剪辑痕迹检测（桌面端）",
+  "description": "音视频 AI 生成 / 剪辑痕迹检测",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
-  },
-  "dependencies": {
-    "vue": "^3.5.13"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "runtime": "node scripts/prepare-runtime.mjs",
+    "pack:dir": "electron-vite build && electron-builder --dir",
+    "dist:win": "node scripts/prepare-runtime.mjs win32-x64 && electron-vite build && electron-builder --win --x64",
+    "dist:mac": "node scripts/prepare-runtime.mjs && electron-vite build && electron-builder --mac",
+    "check": "vue-tsc --noEmit -p tsconfig.json && vitest run"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
     "electron": "^39.2.7",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^3.0.0",
+    "extract-zip": "^2.0.1",
     "typescript": "^5.7.0",
     "vite": "^6.3.0",
+    "vitest": "^3.2.7",
+    "vue": "^3.5.13",
     "vue-tsc": "^2.2.0"
-  }
+  },
+  "author": "avdetect"
 }

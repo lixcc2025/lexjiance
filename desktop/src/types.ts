@@ -1,64 +1,11 @@
-// 引擎输出的结构（对应 engine/avengine/models.py）和 preload 暴露的接口
+// 页面用的类型和显示用的小工具。数据结构本身在 shared/schema.ts（主进程和页面共用）。
+import type { Bridge, Level, Severity, Category } from "../shared/schema"
+export type * from "../shared/schema"
 
-export type Severity = "info" | "low" | "medium" | "high"
-export type Category = "ai" | "edit" | "source"
-export type Level = "none" | "suspicious" | "likely" | "unknown"
-
-export interface Finding {
-  detector: string
-  category: Category
-  severity: Severity
-  title: string
-  detail: string
-  modality: "file" | "video" | "audio"
-  start: number | null
-  end: number | null
-  evidence: Record<string, unknown>
-}
-export interface Verdict { level: Level; text: string; score: number | null }
-export interface DetectorStatus { name: string; title: string; desc: string; ok: boolean; skipped: string; error: string; seconds: number }
-export interface DetectorInfo { name: string; title: string; desc: string; needs: string; uses_model: boolean }
-export interface MediaSummary {
-  format: string
-  duration: number | null
-  size: number
-  video: { codec: string; width: number; height: number; fps: string } | null
-  audio: { codec: string; sample_rate: number; channels: number } | null
-}
-export interface AnalyzeResult {
-  file: string
-  media: MediaSummary
-  ai: Verdict
-  edit: Verdict
-  findings: Finding[]
-  detectors: DetectorStatus[]
-}
-export interface Preview {
-  duration: number
-  waveform: number[]
-  spectrogram: string | null
-  frames: { t: number; path: string }[]
-}
 export interface HistoryItem { path: string; name: string; time: number; ai: Level; edit: Level; count: number }
 
 declare global {
-  interface Window {
-    avd: {
-      pickFile(): Promise<string | null>
-      pathOf(file: File): string
-      analyze(file: string): Promise<{ ok: boolean; job?: string; error?: string }>
-      cancel(job: string): Promise<boolean>
-      listDetectors(): Promise<DetectorInfo[]>
-      preview(path: string): Promise<Preview | null>
-      setTheme(t: string): Promise<void>
-      appInfo(): Promise<{ platform: string; version: string; titlebar: number }>
-      onMenu(cb: (cmd: string) => void): void
-      showInFolder(path: string): Promise<void>
-      fileExists(path: string): Promise<boolean>
-      onOpenFile(cb: (path: string) => void): void
-      onEvent(cb: (ev: any) => void): () => void
-    }
-  }
+  interface Window { avd: Bridge }
 }
 
 export const SEV_TEXT: Record<Severity, string> = { info: "说明", low: "轻微", medium: "可疑", high: "高度可疑" }

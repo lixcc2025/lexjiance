@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 结论区：检测中显示进度环和检测项流水线；完成后显示两项结论和检测项状态
 import { computed } from "vue"
-import Icon from "./Icon.vue"
-import { LEVEL_TEXT, LEVEL_TONE, type AnalyzeResult, type DetectorInfo, type DetectorStatus, type Finding, type Verdict } from "../types"
+import Icon from "../common/Icon.vue"
+import { LEVEL_TEXT, LEVEL_TONE, type AnalyzeResult, type DetectorInfo, type DetectorStatus, type Finding, type Verdict } from "../../types"
 
 const props = defineProps<{
   result: AnalyzeResult | null
@@ -24,22 +24,23 @@ const count = (cat: string) => issues.value.filter((f) => f.category === cat).le
 const totalSec = computed(() => (props.result?.detectors || []).reduce((s, d) => s + d.seconds, 0))
 const items = computed(() =>
   props.result
-    ? props.result.detectors.map((s) => ({ name: s.name, title: s.title, uses_model: props.detectors.find((d) => d.name === s.name)?.uses_model }))
+    ? props.result.detectors.map((s) => ({ name: s.name, title: s.title, cloud: props.detectors.find((d) => d.name === s.name)?.cloud }))
     : props.detectors,
 )
 function state(name: string) {
   const s = props.status[name] || props.result?.detectors.find((d) => d.name === name)
-  if (!s) return name === props.current ? "run" : "wait"
+  if (!s) return name === props.current || (props.current === "cloud" && isCloud(name)) ? "run" : "wait"
   if (!s.ok) return "err"
   return s.skipped ? "skip" : "done"
 }
+const isCloud = (name: string) => !!props.detectors.find((d) => d.name === name)?.cloud
 function reason(name: string) {
   const s = props.status[name] || props.result?.detectors.find((d) => d.name === name)
   return s ? (s.error || s.skipped || "完成") : ""
 }
 function note(name: string) {
   const s = props.status[name] || props.result?.detectors.find((d) => d.name === name)
-  if (!s) return name === props.current ? "检测中" : ""
+  if (!s) return name === props.current || (props.current === "cloud" && isCloud(name)) ? "检测中" : ""
   if (!s.ok) return "出错"
   if (s.skipped) return ""
   return s.seconds < 0.1 ? "<0.1s" : s.seconds.toFixed(1) + "s"
@@ -98,7 +99,7 @@ function note(name: string) {
             <Icon v-else-if="state(d.name) === 'err'" name="x" :size="10" :stroke="3.2" />
             <i v-else-if="state(d.name) === 'run'" class="spin" />
           </span>
-          <span class="st">{{ d.title }}<em v-if="d.uses_model">模型</em></span>
+          <span class="st">{{ d.title }}<em v-if="d.cloud">云端</em></span>
           <span class="nt">{{ note(d.name) }}</span>
         </div>
       </div>

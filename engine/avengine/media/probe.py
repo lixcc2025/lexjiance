@@ -3,27 +3,24 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 from dataclasses import dataclass, field
 from typing import Any, Optional
+
+from .tools import ToolMissing, ffprobe_bin, popen_kwargs
 
 
 class ProbeError(RuntimeError):
     pass
 
 
-def ffprobe_bin() -> str:
-    p = os.environ.get("AVENGINE_FFPROBE") or shutil.which("ffprobe")
-    if not p:
-        raise ProbeError("找不到 ffprobe")
-    return p
-
-
 def run_ffprobe(args: list[str], timeout: float = 120) -> dict[str, Any]:
-    cmd = [ffprobe_bin(), "-v", "error", "-of", "json", *args]
     try:
-        out = subprocess.run(cmd, capture_output=True, timeout=timeout, check=False)
+        cmd = [ffprobe_bin(), "-v", "error", "-of", "json", *args]
+    except ToolMissing as e:
+        raise ProbeError(str(e)) from e
+    try:
+        out = subprocess.run(cmd, capture_output=True, timeout=timeout, check=False, **popen_kwargs())
     except subprocess.TimeoutExpired as e:
         raise ProbeError("ffprobe 超时") from e
     if out.returncode != 0:

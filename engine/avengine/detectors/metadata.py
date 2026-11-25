@@ -14,7 +14,7 @@ import json
 import re
 
 from ..models import AI, EDIT, SOURCE, Finding
-from ..probe import MediaInfo
+from ..media.probe import MediaInfo
 from .base import Detector, Progress
 
 # 元数据里出现这些字样，说明文件经过 / 来自这些 AI 工具（全部小写比较）

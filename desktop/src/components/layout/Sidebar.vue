@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // 侧栏：品牌、新建检测、检测记录、引擎状态。macOS 下透明，露出系统半透明材质
-import Icon from "./Icon.vue"
-import { LEVEL_TONE, type HistoryItem } from "../types"
+import Icon from "../common/Icon.vue"
+import { LEVEL_TONE, type HistoryItem } from "../../types"
 
-defineProps<{ history: HistoryItem[]; active: string | null; engineReady: boolean; mac: boolean; theme: string }>()
-const emit = defineEmits<{ (e: "new"): void; (e: "open", p: string): void; (e: "home"): void; (e: "clear"): void; (e: "theme", t: string): void }>()
+defineProps<{ history: HistoryItem[]; active: string | null; engineReady: boolean; mac: boolean; theme: string; cloud: "off" | "on" | "nourl" }>()
+const emit = defineEmits<{ (e: "new"): void; (e: "open", p: string): void; (e: "home"): void; (e: "clear"): void; (e: "theme", t: string): void; (e: "settings"): void }>()
 const THEMES = [
   { k: "system", t: "自动", d: "M12 3v18 M12 21a9 9 0 0 0 0-18 M12 21a9 9 0 0 1 0-18" },
   { k: "light", t: "浅色", d: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z M12 1v2 M12 21v2 M4.2 4.2l1.4 1.4 M18.4 18.4l1.4 1.4 M1 12h2 M21 12h2 M4.2 19.8l1.4-1.4 M18.4 5.6l1.4-1.4" },
@@ -62,12 +62,13 @@ function when(t: number) {
 
     <div class="status">
       <div class="st"><span class="led" :class="engineReady ? 'ok' : 'off'" />本机检测引擎<b>{{ engineReady ? "就绪" : "未就绪" }}</b></div>
-      <div class="st"><span class="led off" />云端 AI 识别<b>未连接</b></div>
+      <div class="st click" title="设置云端 AI 识别" @click="emit('settings')"><span class="led" :class="cloud === 'on' ? 'ok' : 'off'" />云端 AI 识别<b>{{ cloud === "on" ? "已启用" : cloud === "nourl" ? "未配置" : "未启用" }}</b></div>
       <div class="themes">
         <button v-for="m in THEMES" :key="m.k" class="flat" :class="{ on: theme === m.k }" :title="m.t" @click="emit('theme', m.k)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, i) in m.d.split(' M')" :key="i" :d="i ? 'M' + d : d" /></svg>
           {{ m.t }}
         </button>
+        <button class="flat gear" title="设置" @click="emit('settings')"><Icon name="settings" :size="13" /></button>
       </div>
     </div>
   </aside>
@@ -113,5 +114,8 @@ function when(t: number) {
 .led.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .themes { display: flex; gap: 2px; margin-top: 6px; padding: 2px; border-radius: 8px; background: rgba(127, 140, 170, .12); }
 .themes button { flex: 1; height: 24px; padding: 0 4px; font-size: 11px; gap: 4px; color: var(--muted); border-radius: 6px; }
+.st.click { cursor: pointer; }
+.st.click:hover b { color: var(--accent-2); }
+.themes .gear { flex: 0 0 28px; }
 .themes button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .15); }
 </style>

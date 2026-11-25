@@ -1,0 +1,61 @@
+# 打包配置。先跑 scripts/prepare-runtime.mjs 准备运行时（Python、numpy、ffmpeg、引擎），npm run dist:win 会自动做。
+appId: com.avdetect.desktop
+productName: 音视频检测
+executableName: avdetect
+copyright: Copyright © 2026
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+  artifactName: avdetect-${version}-win-x64-setup.${ext}
+  # 运行时（python/、ffmpeg/、engine/、licenses/）原样放进 resources/。
+  # 注意：不能写 ${platform}，它取的是打包所在系统，不是目标系统
+  extraResources:
+    - from: build/runtime/win32-${arch}
+      to: .
+      filter:
+        - "**/*"
+        - "!**/__pycache__/**"
+        - "!**/*.pyc"
+        - "!runtime-manifest.json"
+  # 代码签名：有证书时设置 CSC_LINK / CSC_KEY_PASSWORD 环境变量即可，配置不用改
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: 音视频检测
+  uninstallDisplayName: 音视频检测
+  installerLanguages: [zh_CN]
+  language: "2052"
+  unicode: true
+  deleteAppDataOnUninstall: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  icon: build/icon.png
+  category: public.app-category.utilities
+  extraResources:
+    - from: build/runtime/darwin-${arch}
+      to: .
+      filter:
+        - "**/*"
+        - "!**/__pycache__/**"
+        - "!**/*.pyc"
+        - "!runtime-manifest.json"
+  artifactName: avdetect-${version}-mac-${arch}.${ext}
+  # 公证前要给 python/ 和 ffmpeg/ 里的二进制签名（hardenedRuntime），见 docs/打包.md
+dmg:
+  title: 音视频检测

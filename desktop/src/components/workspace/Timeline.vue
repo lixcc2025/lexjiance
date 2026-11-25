@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 多轨时间轴：画面缩略帧 / 声音波形 / 频谱 / 剪辑痕迹 / AI 生成，共用一根播放头。点击或拖动定位
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import Icon from "./Icon.vue"
-import { SEV_COLOR, fmtTime, mediaUrl, type Finding, type Preview } from "../types"
+import Icon from "../common/Icon.vue"
+import { SEV_COLOR, fmtTime, mediaUrl, type Finding, type Preview } from "../../types"
 
 const props = defineProps<{
   duration: number

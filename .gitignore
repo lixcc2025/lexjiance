@@ -5,3 +5,6 @@ __pycache__/
 .venv/
 models/
 *.onnx
+desktop/release/
+desktop/build/cache/
+desktop/build/runtime/

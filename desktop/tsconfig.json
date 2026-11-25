@@ -6,8 +6,20 @@
     "strict": true,
     "jsx": "preserve",
     "skipLibCheck": true,
-    "types": ["node"],
-    "lib": ["ES2022", "DOM"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
   },
-  "include": ["electron/**/*.ts", "src/**/*.ts", "src/**/*.vue", "src/env.d.ts"]
+  "include": [
+    "electron/**/*.ts",
+    "shared/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "src/env.d.ts",
+    "tests/**/*.ts"
+  ]
 }

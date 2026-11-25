@@ -9,7 +9,7 @@ import statistics
 from typing import Any, Optional
 
 from ..models import EDIT, SOURCE, Finding
-from ..probe import MediaInfo, packets
+from ..media.probe import MediaInfo, packets
 from .base import Detector, Progress
 
 GAP_FACTOR = 3.0         # 两包间隔超过正常间隔的几倍算断档

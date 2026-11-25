@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 播放器：自绘控制条（时间码、倍速、静音、全屏）。时间轴负责拖动定位，这里只管播放
 import { onBeforeUnmount, ref } from "vue"
-import Icon from "./Icon.vue"
-import { fmtTime } from "../types"
+import Icon from "../common/Icon.vue"
+import { fmtTime } from "../../types"
 
 const props = defineProps<{ url: string; isVideo: boolean; art: string | null; name: string }>()
 const emit = defineEmits<{ (e: "time", t: number): void; (e: "duration", d: number): void }>()

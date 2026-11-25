@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Callable
 
 from ..models import Finding
-from ..probe import MediaInfo
+from ..media.probe import MediaInfo
 
 Progress = Callable[[float, str], None]   # (0~1, 说明)
 

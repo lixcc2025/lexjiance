@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 首页：扫描动画插画 + 拖放区 + 能力说明
-import Icon from "./Icon.vue"
+import Icon from "../common/Icon.vue"
 
 defineProps<{ dragging: boolean; mac: boolean }>()
 const emit = defineEmits<{ (e: "pick"): void }>()

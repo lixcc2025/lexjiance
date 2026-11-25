@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 疑点检查器：疑点 / 来源信息两个页签；选中的展开说明和依据，时间轴上同步高亮
 import { computed, nextTick, ref, watch } from "vue"
-import Icon from "./Icon.vue"
-import { CAT_TEXT, SEV_TEXT, fmtTime, type Finding } from "../types"
+import Icon from "../common/Icon.vue"
+import { CAT_TEXT, SEV_TEXT, fmtTime, type Finding } from "../../types"
 
 const props = defineProps<{ findings: Finding[]; active: number; running: boolean }>()
 const emit = defineEmits<{ (e: "select", i: number): void; (e: "seek", i: number): void }>()

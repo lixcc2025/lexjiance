@@ -54,12 +54,12 @@ class EngineTest(unittest.TestCase):
         bad = [f for f in r.findings if f.severity != "info"]
         self.assertEqual(bad, [], [f.title for f in bad])
         self.assertEqual(r.edit.level, "none")
-        self.assertEqual(r.ai.level, "unknown")   # 模型没装，不能说「没有 AI」
+        self.assertEqual(r.ai.level, "unknown")   # AI 模型（云端）没跑，不能说「没有 AI」
         self.assertIn("progress", events)
         self.assertIn("finding", events)
         names = {s.name: s for s in r.detectors}
         self.assertTrue(names["metadata"].ok and not names["metadata"].skipped)
-        self.assertEqual(names["ai_voice"].skipped, "模型未安装")
+        self.assertEqual(set(names), {"metadata", "structure", "audio_splice"})
 
     def test_timestamp_gap(self):
         r, _ = self.run_on("gap.mp4")
@@ -94,7 +94,8 @@ class EngineTest(unittest.TestCase):
     def test_audio_only(self):
         r, _ = self.run_on("voice.wav")
         sk = {s.name: s.skipped for s in r.detectors}
-        self.assertEqual(sk["ai_video"], "没有视频画面")
+        self.assertEqual(sk["structure"], "")
+        self.assertEqual(sk["audio_splice"], "")
         self.assertEqual(r.media["video"], None)
 
     def test_cli_jsonl(self):
@@ -121,6 +122,18 @@ class EngineTest(unittest.TestCase):
         v = make_preview(os.path.join(self.dir, "gap.mp4"), os.path.join(self.dir, "pv3"))   # 没有声音
         self.assertEqual(v["waveform"], [])
         self.assertIsNone(v["spectrogram"])
+
+    def test_extract(self):
+        from avengine.extract import extract
+        r = extract(os.path.join(self.dir, "clean.mp4"), os.path.join(self.dir, "ex"), max_frames=4)
+        self.assertTrue(r["audio"] and os.path.isfile(r["audio"]))
+        self.assertEqual(r["sample_rate"], 16000)
+        self.assertEqual(len(r["frames"]), 4)
+        self.assertEqual([round(f["t"], 2) for f in r["frames"]], [0.75, 2.25, 3.75, 5.25])
+        a = extract(os.path.join(self.dir, "voice.wav"), os.path.join(self.dir, "ex2"))
+        self.assertEqual(a["frames"], [])
+        v = extract(os.path.join(self.dir, "gap.mp4"), os.path.join(self.dir, "ex3"), max_frames=3)
+        self.assertIsNone(v["audio"])
 
     def test_bad_file(self):
         p = os.path.join(self.dir, "not_media.mp4")

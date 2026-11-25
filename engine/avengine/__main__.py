@@ -14,7 +14,7 @@ import sys
 from . import __version__
 from .detectors import ALL
 from .pipeline import analyze
-from .probe import ProbeError
+from .media.probe import ProbeError
 
 SEV = {"info": "说明", "low": "轻微", "medium": "可疑", "high": "高度可疑"}
 
@@ -59,6 +59,10 @@ def main(argv=None) -> int:
     pv = sub.add_parser("preview", help="生成时间轴预览素材（缩略帧、波形、频谱图），打印 JSON")
     pv.add_argument("file")
     pv.add_argument("--out", required=True, help="素材输出目录")
+    ex = sub.add_parser("extract", help="给云端 AI 识别准备上传素材（16k 音轨 + 抽帧），打印清单 JSON")
+    ex.add_argument("file")
+    ex.add_argument("--out", required=True)
+    ex.add_argument("--max-frames", type=int, default=120)
     dp = sub.add_parser("detectors", help="列出检测项")
     dp.add_argument("--json", action="store_true")
     args = p.parse_args(argv)
@@ -69,6 +73,15 @@ def main(argv=None) -> int:
             return 0
         for cls in ALL:
             print(f"{cls.name:<14} {cls.title}：{cls.desc}{'（需要模型）' if cls.uses_model else ''}")
+        return 0
+
+    if args.cmd == "extract":
+        from .extract import extract
+        try:
+            print(json.dumps(extract(args.file, args.out, args.max_frames), ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"error": str(e)}, ensure_ascii=False))
+            return 2
         return 0
 
     if args.cmd == "preview":
