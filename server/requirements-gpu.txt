@@ -1,0 +1,8 @@
+# 显卡服务器：把 onnxruntime 换成 onnxruntime-gpu（需要 NVIDIA 驱动 + CUDA 12 / cuDNN 9，Docker 用 Dockerfile.gpu 即可）
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-multipart>=0.0.9
+numpy>=1.24
+onnxruntime-gpu>=1.19
+soundfile>=0.12
+pillow>=10

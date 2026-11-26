@@ -1,0 +1,11 @@
+{
+  "name": "audioseal-detector",
+  "version": "16bits",
+  "detector": "watermark",
+  "file": "model.onnx",
+  "license": "AudioSeal（MIT）",
+  "input": { "sample_rate": 16000, "window": 1.0, "hop": 0.5, "normalize": "none" },
+  "output": { "type": "prob" },
+  "thresholds": { "medium": 0.5, "high": 0.9 },
+  "batch": 32
+}

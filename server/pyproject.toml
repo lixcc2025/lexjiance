@@ -1,0 +1,8 @@
+[project]
+name = "avserver"
+version = "0.1.0"
+description = "音视频 AI 识别服务（AI 合成语音、AI 生成画面、隐形水印），给桌面端的云端识别用"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["avserver*"]

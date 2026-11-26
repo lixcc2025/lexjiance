@@ -1,0 +1,12 @@
+# 显卡版（NVIDIA）。宿主机要装 NVIDIA 驱动和 nvidia-container-toolkit。构建：docker build -f Dockerfile.gpu -t avserver:gpu .
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y --no-install-recommends python3.11 python3-pip ffmpeg libsndfile1 \
+    && rm -rf /var/lib/apt/lists/* && useradd -r -u 10001 -m avs
+WORKDIR /app
+COPY requirements-gpu.txt .
+RUN python3.11 -m pip install --no-cache-dir -r requirements-gpu.txt
+COPY avserver ./avserver
+ENV AVS_MODELS_DIR=/models AVS_TOKENS_FILE=/data/tokens.txt AVS_DEVICE=cuda PYTHONUNBUFFERED=1
+USER avs
+EXPOSE 8000
+CMD ["python3.11", "-m", "avserver", "serve", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,31 @@
+# 一键部署：识别服务 + Caddy（自动 HTTPS）。用法见 docs/服务器部署.md
+#   公网：设置 AVS_DOMAIN=ai.你的域名.com，Caddy 自动申请证书
+#   内网：AVS_DOMAIN=:443 并把 Caddyfile 里的 tls 改成 internal（内部证书，客户端要导入根证书），或直接用内网 http
+services:
+  avserver:
+    build: .                      # 显卡服务器改成 build: { context: ., dockerfile: Dockerfile.gpu }，并取消下面 deploy 的注释
+    restart: unless-stopped
+    environment:
+      AVS_MAX_CONCURRENT: "2"
+      AVS_MAX_UPLOAD_MB: "300"
+    volumes:
+      - ./models:/models:ro       # 模型目录，每个子目录一个模型（model.json + model.onnx）
+      - ./data:/data              # tokens.txt（令牌哈希）
+    tmpfs:
+      - /tmp                      # 请求临时文件只在内存里，重启即清
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["443:443", "80:80"]
+    environment:
+      AVS_DOMAIN: ${AVS_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [avserver]
+volumes:
+  caddy_data:

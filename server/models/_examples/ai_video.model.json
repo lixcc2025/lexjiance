@@ -1,0 +1,12 @@
+{
+  "name": "video-clip-probe",
+  "version": "2026.12",
+  "detector": "ai_video",
+  "file": "model.onnx",
+  "license": "CLIP ViT-L/14（MIT）+ 线性分类头自训（UniversalFakeDetect 做法，MIT）",
+  "input": { "size": [224, 224], "resize": "center_crop", "layout": "NCHW", "scale": 255,
+             "mean": [0.48145466, 0.4578275, 0.40821073], "std": [0.26862954, 0.26130258, 0.27577711] },
+  "output": { "type": "logit" },
+  "thresholds": { "medium": 0.5, "high": 0.85 },
+  "batch": 16
+}

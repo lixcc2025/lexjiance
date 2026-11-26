@@ -1,0 +1,4 @@
+models/*
+!models/README.md
+!models/_examples/
+data/

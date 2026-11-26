@@ -18,7 +18,27 @@ from .media.probe import probe
 AUDIO_RATE = 16000
 MAX_FRAMES = 120
 FRAME_EDGE = 512
+ONE_PASS_SECONDS = 600   # 10 分钟以内的视频解码一遍抽完；更长的逐张跳着抽，免得整段解码
 OURS = r"audio\.flac|f\d{4}\.jpg"
+
+
+def _frames_one_pass(path: str, stream_index: int, dur: float, n: int, scale: str, outdir: str) -> list[dict[str, Any]]:
+    """短视频：解码一遍、按固定间隔出 n 张（第 i 张在 (i + 0.5) × 时长 / n 秒）。比每张单独起一次 ffmpeg 快很多"""
+    step = dur / n
+    try:
+        run(["-y", "-ss", f"{step / 2:.3f}", "-i", path, *map_args(stream_index), "-vf", f"fps=1/{step:.6f},{scale}",
+             "-frames:v", str(n), "-q:v", "3", os.path.join(outdir, "f%04d.jpg")], timeout=1800)
+    except FFError:
+        return []
+    got = []
+    for i in range(n):
+        # ffmpeg 的 %04d 从 1 开始编号；改成从 0 开始，和逐张抽的命名一致
+        src, dst = os.path.join(outdir, f"f{i + 1:04d}.jpg"), os.path.join(outdir, f"f{i:04d}.jpg")
+        if not os.path.isfile(src):
+            break
+        os.replace(src, dst)
+        got.append({"t": round(step * (i + 0.5), 3), "file": dst})
+    return got
 
 
 def extract(path: str, outdir: str, max_frames: int = MAX_FRAMES) -> dict[str, Any]:
@@ -35,6 +55,10 @@ def extract(path: str, outdir: str, max_frames: int = MAX_FRAMES) -> dict[str, A
     if v and dur > 0:
         n = max(1, min(max_frames, int(dur)))
         scale = f"scale='if(gt(iw,ih),{FRAME_EDGE},-2)':'if(gt(iw,ih),-2,{FRAME_EDGE})'"
+        if dur <= ONE_PASS_SECONDS:
+            out["frames"] = _frames_one_pass(path, v.index, dur, n, scale, outdir)
+            if out["frames"]:
+                return out
         for i in range(n):
             t = dur * (i + 0.5) / n
             f = os.path.join(outdir, f"f{i:04d}.jpg")

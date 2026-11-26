@@ -3,7 +3,6 @@ desktop/out/
 __pycache__/
 *.pyc
 .venv/
-models/
 *.onnx
 desktop/release/
 desktop/build/cache/

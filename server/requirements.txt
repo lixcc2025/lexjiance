@@ -1,0 +1,8 @@
+# 服务运行（CPU 推理）。显卡服务器用 requirements-gpu.txt
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-multipart>=0.0.9
+numpy>=1.24
+onnxruntime>=1.19
+soundfile>=0.12
+pillow>=10

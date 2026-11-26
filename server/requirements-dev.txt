@@ -1,0 +1,3 @@
+-r requirements.txt
+httpx>=0.27     # 测试客户端
+onnx>=1.16      # 测试时现场搭假模型

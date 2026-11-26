@@ -1,0 +1,11 @@
+{
+  "name": "voice-xlsr-zh",
+  "version": "2026.12",
+  "detector": "ai_voice",
+  "file": "model.onnx",
+  "license": "代码 MIT（SSL_Anti-spoofing）；分类头自训；XLS-R 底座许可证待确认",
+  "input": { "sample_rate": 16000, "window": 4.0, "hop": 2.0, "normalize": "zscore" },
+  "output": { "type": "logits2", "fake_index": 1 },
+  "thresholds": { "medium": 0.5, "high": 0.85 },
+  "batch": 8
+}
